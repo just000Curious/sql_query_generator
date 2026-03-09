@@ -1,283 +1,891 @@
 """
-SQL Query Generator - Main Application
-Integrates all query building and validation modules
+Streamlit UI for SQL Query Generator
+Connects to FastAPI backend and provides interactive interface
 """
 
-import os
-import sys
-from pathlib import Path
+import streamlit as st
+import requests
+import pandas as pd
+import json
+import time
+from datetime import datetime
+import plotly.express as px
+import plotly.graph_objects as go
 
-# Add src to path for imports
-sys.path.insert(0, str(Path(__file__).parent))
+# ========== CONFIGURATION ==========
 
-from query_engine import QueryEngine
-from query_validator import QueryValidator
-from query_assembler import QueryAssembler
-from cte_builder import CTEBuilder
-from join_builder import JoinBuilder
-from temporary_table import TemporaryTable
-from db_information import DBInfo
-from pypika_query_engine import QueryGenerator
+API_URL = "http://localhost:8000"  # FastAPI backend URL
 
+# Page config
+st.set_page_config(
+    page_title="SQL Query Generator",
+    page_icon="🔍",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-class SQLQueryGenerator:
-    """Main application class for SQL Query Generator"""
+# Custom CSS
+st.markdown("""
+<style>
+    .stButton > button {
+        width: 100%;
+        background-color: #4CAF50;
+        color: white;
+        font-weight: bold;
+    }
+    .success-box {
+        padding: 10px;
+        border-radius: 5px;
+        background-color: #d4edda;
+        border: 1px solid #c3e6cb;
+        color: #155724;
+    }
+    .error-box {
+        padding: 10px;
+        border-radius: 5px;
+        background-color: #f8d7da;
+        border: 1px solid #f5c6cb;
+        color: #721c24;
+    }
+    .warning-box {
+        padding: 10px;
+        border-radius: 5px;
+        background-color: #fff3cd;
+        border: 1px solid #ffeeba;
+        color: #856404;
+    }
+    .info-box {
+        padding: 10px;
+        border-radius: 5px;
+        background-color: #d1ecf1;
+        border: 1px solid #bee5eb;
+        color: #0c5460;
+    }
+    .metric-card {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 5px;
+        text-align: center;
+        box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+    }
+</style>
+""", unsafe_allow_html=True)
 
-    def __init__(self, db_path="db_files"):
-        self.db_path = Path(db_path)
-        self.db_path.mkdir(exist_ok=True)
+# ========== SESSION STATE INITIALIZATION ==========
 
-        # Initialize components
-        self.db_info = DBInfo(self.db_path)
-        self.query_engine = QueryEngine()
-        self.query_validator = QueryValidator()
-        self.query_assembler = QueryAssembler()
-        self.cte_builder = CTEBuilder()
-        self.join_builder = JoinBuilder()
-        self.temp_table = TemporaryTable()
-        self.pypika_engine = PyPikaQueryEngine()
+if 'session_id' not in st.session_state:
+    st.session_state.session_id = None
+if 'tables' not in st.session_state:
+    st.session_state.tables = []
+if 'columns' not in st.session_state:
+    st.session_state.columns = {}
+if 'relationships' not in st.session_state:
+    st.session_state.relationships = []
+if 'last_query' not in st.session_state:
+    st.session_state.last_query = None
+if 'query_results' not in st.session_state:
+    st.session_state.query_results = None
+if 'temp_tables' not in st.session_state:
+    st.session_state.temp_tables = []
+if 'ctes' not in st.session_state:
+    st.session_state.ctes = []
 
-        self.current_query = None
-        self.query_history = []
+# ========== HELPER FUNCTIONS ==========
 
-    def create_select_query(self, table, columns=None, where=None):
-        """Create a SELECT query"""
-        query = self.query_assembler.select(table, columns, where)
-        self.current_query = query
-        self.query_history.append(('SELECT', query))
-        return query
+def check_api_health():
+    """Check if API is running"""
+    try:
+        response = requests.get(f"{API_URL}/health", timeout=2)
+        return response.status_code == 200
+    except:
+        return False
 
-    def create_cte_query(self, cte_name, cte_query, main_query):
-        """Create a query with CTE"""
-        query = self.cte_builder.build_cte(cte_name, cte_query, main_query)
-        self.current_query = query
-        self.query_history.append(('CTE', query))
-        return query
+def create_session():
+    """Create a new session"""
+    try:
+        response = requests.post(f"{API_URL}/sessions/create")
+        if response.status_code == 200:
+            st.session_state.session_id = response.json()['session_id']
+            return True
+    except:
+        return False
+    return False
 
-    def create_join_query(self, tables, join_conditions, join_type='INNER'):
-        """Create a JOIN query"""
-        query = self.join_builder.build_join(tables, join_conditions, join_type)
-        self.current_query = query
-        self.query_history.append(('JOIN', query))
-        return query
+def load_tables():
+    """Load tables from database"""
+    try:
+        response = requests.get(f"{API_URL}/tables")
+        if response.status_code == 200:
+            st.session_state.tables = response.json()['tables']
+            return True
+    except:
+        return False
+    return False
 
-    def create_temp_table_query(self, table_name, select_query):
-        """Create a temporary table query"""
-        query = self.temp_table.create_temp_table(table_name, select_query)
-        self.current_query = query
-        self.query_history.append(('TEMP TABLE', query))
-        return query
+def load_columns(table_name):
+    """Load columns for a specific table"""
+    try:
+        response = requests.get(f"{API_URL}/tables/{table_name}/columns")
+        if response.status_code == 200:
+            st.session_state.columns[table_name] = response.json()['columns']
+            return response.json()['columns']
+    except:
+        return []
+    return []
 
-    def validate_query(self, query=None):
-        """Validate the current or provided query"""
-        if query is None:
-            query = self.current_query
+def load_relationships(table=None):
+    """Load relationships"""
+    try:
+        url = f"{API_URL}/relationships"
+        if table:
+            url += f"?table={table}"
+        response = requests.get(url)
+        if response.status_code == 200:
+            st.session_state.relationships = response.json()['relationships']
+            return True
+    except:
+        return False
+    return False
 
-        if not query:
-            return {"valid": False, "error": "No query to validate"}
+def generate_query(params):
+    """Generate SQL query"""
+    try:
+        response = requests.post(
+            f"{API_URL}/query/generate",
+            json=params,
+            params={"session_id": st.session_state.session_id}
+        )
+        if response.status_code == 200:
+            data = response.json()
+            st.session_state.last_query = data.get('query')
+            return data
+    except Exception as e:
+        st.error(f"Error: {str(e)}")
+    return None
 
-        return self.query_validator.validate(query)
+def validate_query(sql):
+    """Validate SQL query"""
+    try:
+        response = requests.post(
+            f"{API_URL}/query/validate",
+            json={"sql": sql, "validate": True}
+        )
+        if response.status_code == 200:
+            return response.json()
+    except:
+        pass
+    return None
 
-    def execute_query(self, query=None):
-        """Execute the current or provided query"""
-        if query is None:
-            query = self.current_query
+def execute_query(sql):
+    """Execute SQL query"""
+    try:
+        response = requests.post(
+            f"{API_URL}/query/execute",
+            json={"sql": sql},
+            params={"session_id": st.session_state.session_id}
+        )
+        if response.status_code == 200:
+            return response.json()
+    except:
+        pass
+    return None
 
-        if not query:
-            return {"success": False, "error": "No query to execute"}
+def create_temp_table(name, query=None, columns=None):
+    """Create temporary table"""
+    try:
+        data = {"name": name}
+        if query:
+            data["query"] = query
+        if columns:
+            data["columns"] = columns
 
-        # Validate before executing
-        validation = self.validate_query(query)
-        if not validation.get('valid', False):
-            return {"success": False, "error": validation.get('error', 'Invalid query')}
+        response = requests.post(
+            f"{API_URL}/temp/create",
+            json=data,
+            params={"session_id": st.session_state.session_id}
+        )
+        if response.status_code == 200:
+            return response.json()
+    except:
+        pass
+    return None
 
-        return self.query_engine.execute(query)
+def build_join(table1, table2, join_type="INNER JOIN", condition=None):
+    """Build a join"""
+    try:
+        data = {
+            "tables": [
+                {"table": table1},
+                {"table": table2}
+            ],
+            "join_type": join_type
+        }
+        if condition:
+            data["condition"] = condition
 
-    def get_table_info(self, table_name=None):
-        """Get database table information"""
-        if table_name:
-            return self.db_info.get_table_schema(table_name)
-        return self.db_info.get_all_tables()
+        response = requests.post(
+            f"{API_URL}/join/build",
+            json=data,
+            params={"session_id": st.session_state.session_id}
+        )
+        if response.status_code == 200:
+            return response.json()
+    except:
+        pass
+    return None
 
-    def build_with_pypika(self, table_name):
-        """Build query using PyPika"""
-        return self.pypika_engine.build_query(table_name)
+def create_cte(name, query):
+    """Create a CTE"""
+    try:
+        response = requests.post(
+            f"{API_URL}/cte/create",
+            json={"name": name, "query": query},
+            params={"session_id": st.session_state.session_id}
+        )
+        if response.status_code == 200:
+            return response.json()
+    except:
+        pass
+    return None
 
-    def show_history(self):
-        """Show query history"""
-        if not self.query_history:
-            print("No queries in history")
-            return
+def assemble_query():
+    """Assemble final query"""
+    try:
+        response = requests.post(
+            f"{API_URL}/assemble",
+            params={"session_id": st.session_state.session_id}
+        )
+        if response.status_code == 200:
+            data = response.json()
+            st.session_state.last_query = data.get('query')
+            return data
+    except:
+        pass
+    return None
 
-        print("\n=== Query History ===")
-        for i, (q_type, query) in enumerate(self.query_history, 1):
-            print(f"{i}. [{q_type}] {query[:50]}...")
-
-    def save_query(self, filename, query=None):
-        """Save query to file"""
-        if query is None:
-            query = self.current_query
-
-        if not query:
-            print("No query to save")
-            return False
-
-        filepath = self.db_path / filename
-        with open(filepath, 'w') as f:
-            f.write(query)
-        print(f"Query saved to {filepath}")
-        return True
-
-    def load_query(self, filename):
-        """Load query from file"""
-        filepath = self.db_path / filename
-        if not filepath.exists():
-            print(f"File {filename} not found")
-            return None
-
-        with open(filepath, 'r') as f:
-            query = f.read()
-
-        self.current_query = query
-        self.query_history.append(('LOADED', query))
-        return query
-
+# ========== MAIN APP ==========
 
 def main():
-    """Main CLI interface"""
-    generator = SQLQueryGenerator()
+    # Sidebar
+    with st.sidebar:
+        st.image("https://img.icons8.com/color/96/000000/sql.png", width=80)
+        st.title("SQL Query Generator")
+        st.markdown("---")
 
-    print("=" * 50)
-    print("SQL Query Generator")
-    print("=" * 50)
-
-    while True:
-        print("\nOptions:")
-        print("1. Create SELECT query")
-        print("2. Create CTE query")
-        print("3. Create JOIN query")
-        print("4. Create TEMP TABLE query")
-        print("5. Validate current query")
-        print("6. Execute current query")
-        print("7. Show table info")
-        print("8. Show query history")
-        print("9. Save query to file")
-        print("10. Load query from file")
-        print("11. Build with PyPika")
-        print("0. Exit")
-
-        choice = input("\nEnter your choice: ").strip()
-
-        if choice == '1':
-            table = input("Table name: ")
-            columns = input("Columns (comma-separated, or *): ").strip()
-            columns = ['*'] if columns == '*' else [c.strip() for c in columns.split(',')]
-            where = input("WHERE clause (optional): ").strip() or None
-
-            query = generator.create_select_query(table, columns, where)
-            print(f"\nGenerated Query:\n{query}")
-
-        elif choice == '2':
-            cte_name = input("CTE name: ")
-            print("Enter CTE query (end with blank line):")
-            cte_lines = []
-            while True:
-                line = input()
-                if not line:
-                    break
-                cte_lines.append(line)
-            cte_query = '\n'.join(cte_lines)
-
-            print("Enter main query (end with blank line):")
-            main_lines = []
-            while True:
-                line = input()
-                if not line:
-                    break
-                main_lines.append(line)
-            main_query = '\n'.join(main_lines)
-
-            query = generator.create_cte_query(cte_name, cte_query, main_query)
-            print(f"\nGenerated Query:\n{query}")
-
-        elif choice == '3':
-            tables = input("Tables (comma-separated): ").split(',')
-            tables = [t.strip() for t in tables]
-
-            print("Enter join conditions (one per line, end with blank line):")
-            conditions = []
-            while True:
-                line = input()
-                if not line:
-                    break
-                conditions.append(line)
-
-            join_type = input("Join type (INNER/LEFT/RIGHT/FULL, default INNER): ").strip().upper() or 'INNER'
-
-            query = generator.create_join_query(tables, conditions, join_type)
-            print(f"\nGenerated Query:\n{query}")
-
-        elif choice == '4':
-            temp_name = input("Temporary table name: ")
-            print("Enter SELECT query for temp table (end with blank line):")
-            select_lines = []
-            while True:
-                line = input()
-                if not line:
-                    break
-                select_lines.append(line)
-            select_query = '\n'.join(select_lines)
-
-            query = generator.create_temp_table_query(temp_name, select_query)
-            print(f"\nGenerated Query:\n{query}")
-
-        elif choice == '5':
-            result = generator.validate_query()
-            if result.get('valid'):
-                print("✓ Query is valid")
-            else:
-                print(f"✗ Invalid query: {result.get('error')}")
-
-        elif choice == '6':
-            result = generator.execute_query()
-            if result.get('success'):
-                print("✓ Query executed successfully")
-                if 'data' in result:
-                    print(f"Results: {result['data']}")
-            else:
-                print(f"✗ Execution failed: {result.get('error')}")
-
-        elif choice == '7':
-            table = input("Table name (optional, press Enter for all): ").strip() or None
-            info = generator.get_table_info(table)
-            print(f"\nTable Information:\n{info}")
-
-        elif choice == '8':
-            generator.show_history()
-
-        elif choice == '9':
-            filename = input("Filename to save: ")
-            generator.save_query(filename)
-
-        elif choice == '10':
-            filename = input("Filename to load: ")
-            query = generator.load_query(filename)
-            if query:
-                print(f"\nLoaded Query:\n{query}")
-
-        elif choice == '11':
-            table = input("Table name: ")
-            query = generator.build_with_pypika(table)
-            print(f"\nPyPika Generated Query:\n{query}")
-            generator.current_query = query
-
-        elif choice == '0':
-            print("Goodbye!")
-            break
+        # API Connection Status
+        api_healthy = check_api_health()
+        if api_healthy:
+            st.success("✅ API Connected")
         else:
-            print("Invalid choice, please try again")
+            st.error("❌ API Not Connected")
+            st.info("Run: `python api.py` to start the backend")
+            st.stop()
 
+        # Session Management
+        st.subheader("📊 Session")
+        if st.button("🆕 Create New Session"):
+            if create_session():
+                st.success("Session created!")
+                st.rerun()
+            else:
+                st.error("Failed to create session")
+
+        if st.session_state.session_id:
+            st.info(f"Session ID: `{st.session_state.session_id[:8]}...`")
+
+        st.markdown("---")
+
+        # Navigation
+        st.subheader("🧭 Navigation")
+        page = st.radio(
+            "Go to",
+            ["🏠 Dashboard",
+             "📝 Query Builder",
+             "🔗 Join Builder",
+             "🔄 CTE Builder",
+             "📦 Temp Tables",
+             "✅ Validator",
+             "📊 Results",
+             "🔍 Schema Explorer"]
+        )
+
+        st.markdown("---")
+
+        # Quick Actions
+        st.subheader("⚡ Quick Actions")
+        if st.button("📥 Load Tables"):
+            if load_tables():
+                st.success(f"Loaded {len(st.session_state.tables)} tables")
+                st.rerun()
+
+        if st.button("🔄 Load Relationships"):
+            if load_relationships():
+                st.success(f"Loaded {len(st.session_state.relationships)} relationships")
+
+        st.markdown("---")
+        st.caption(f"v1.0.0 | {datetime.now().strftime('%Y-%m-%d')}")
+
+    # Main content area
+    if page == "🏠 Dashboard":
+        show_dashboard()
+    elif page == "📝 Query Builder":
+        show_query_builder()
+    elif page == "🔗 Join Builder":
+        show_join_builder()
+    elif page == "🔄 CTE Builder":
+        show_cte_builder()
+    elif page == "📦 Temp Tables":
+        show_temp_tables()
+    elif page == "✅ Validator":
+        show_validator()
+    elif page == "📊 Results":
+        show_results()
+    elif page == "🔍 Schema Explorer":
+        show_schema_explorer()
+
+# ========== DASHBOARD ==========
+
+def show_dashboard():
+    st.title("🏠 SQL Query Generator Dashboard")
+
+    # Metrics
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        with st.container():
+            st.markdown('<div class="metric-card">', unsafe_allow_html=True)
+            st.metric("📊 Tables", len(st.session_state.tables))
+            st.markdown('</div>', unsafe_allow_html=True)
+
+    with col2:
+        with st.container():
+            st.markdown('<div class="metric-card">', unsafe_allow_html=True)
+            total_columns = sum(len(cols) for cols in st.session_state.columns.values())
+            st.metric("📋 Columns", total_columns)
+            st.markdown('</div>', unsafe_allow_html=True)
+
+    with col3:
+        with st.container():
+            st.markdown('<div class="metric-card">', unsafe_allow_html=True)
+            st.metric("🔗 Relationships", len(st.session_state.relationships))
+            st.markdown('</div>', unsafe_allow_html=True)
+
+    with col4:
+        with st.container():
+            st.markdown('<div class="metric-card">', unsafe_allow_html=True)
+            st.metric("📦 Temp Tables", len(st.session_state.temp_tables))
+            st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    # Quick Start Guide
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.subheader("🚀 Quick Start")
+        st.markdown("""
+        1. **Load Tables** from sidebar
+        2. Go to **Query Builder** to create SQL
+        3. Use **Join Builder** for complex joins
+        4. Create **CTEs** for multi-stage queries
+        5. **Validate** your query
+        6. **Execute** and see results
+        """)
+
+        st.subheader("🎯 Features")
+        st.markdown("""
+        - ✅ Interactive SQL generation
+        - ✅ Automatic join detection
+        - ✅ CTE support
+        - ✅ Temporary tables
+        - ✅ Query validation
+        - ✅ Export results (CSV/JSON)
+        """)
+
+    with col2:
+        st.subheader("📊 Database Overview")
+        if st.session_state.tables:
+            df = pd.DataFrame({
+                "Table": st.session_state.tables,
+                "Columns": [len(st.session_state.columns.get(t, [])) for t in st.session_state.tables],
+                "Relationships": [sum(1 for r in st.session_state.relationships if r.get('table') == t)
+                                 for t in st.session_state.tables]
+            })
+            st.dataframe(df, use_container_width=True)
+        else:
+            st.info("Click 'Load Tables' in sidebar to view database schema")
+
+# ========== QUERY BUILDER ==========
+
+def show_query_builder():
+    st.title("📝 Query Builder")
+
+    if not st.session_state.tables:
+        st.warning("Please load tables first from the sidebar")
+        return
+
+    col1, col2 = st.columns([2, 1])
+
+    with col1:
+        # Table Selection
+        selected_tables = st.multiselect(
+            "Select Tables",
+            st.session_state.tables,
+            help="Choose tables to query"
+        )
+
+        if selected_tables:
+            # Column Selection
+            st.subheader("Select Columns")
+            columns_to_select = []
+
+            for table in selected_tables:
+                if table not in st.session_state.columns:
+                    load_columns(table)
+
+                cols = st.session_state.columns.get(table, [])
+                col_names = [c['column_name'] for c in cols]
+
+                selected_cols = st.multiselect(
+                    f"Columns from {table}",
+                    ["*"] + col_names,
+                    key=f"cols_{table}"
+                )
+
+                for col in selected_cols:
+                    columns_to_select.append({
+                        "table": table,
+                        "column": col
+                    })
+
+            # Where Conditions
+            st.subheader("Where Conditions")
+            num_conditions = st.number_input("Number of conditions", 0, 10, 0)
+
+            conditions = []
+            for i in range(num_conditions):
+                with st.expander(f"Condition {i+1}"):
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        table = st.selectbox("Table", selected_tables, key=f"cond_table_{i}")
+                    with col2:
+                        if table in st.session_state.columns:
+                            cols = [c['column_name'] for c in st.session_state.columns.get(table, [])]
+                            column = st.selectbox("Column", cols, key=f"cond_col_{i}")
+                    with col3:
+                        operator = st.selectbox("Operator",
+                                               ["=", ">", "<", ">=", "<=", "!=", "LIKE", "IN"],
+                                               key=f"cond_op_{i}")
+                    value = st.text_input("Value", key=f"cond_val_{i}")
+
+                    conditions.append({
+                        "table": table,
+                        "column": column,
+                        "operator": operator,
+                        "value": value
+                    })
+
+            # Advanced Options
+            with st.expander("Advanced Options"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    limit = st.number_input("Limit", 0, 10000, 0)
+                with col2:
+                    offset = st.number_input("Offset", 0, 10000, 0)
+
+                order_by = st.text_input("Order By (comma-separated columns)")
+                group_by = st.text_input("Group By (comma-separated columns)")
+
+                use_cte = st.checkbox("Use CTE")
+                cte_name = None
+                if use_cte:
+                    cte_name = st.text_input("CTE Name", "my_cte")
+
+                create_temp = st.checkbox("Create as Temporary Table")
+                temp_name = None
+                if create_temp:
+                    temp_name = st.text_input("Temporary Table Name", "temp_results")
+
+    with col2:
+        st.subheader("Query Preview")
+
+        if st.button("🚀 Generate Query", type="primary"):
+            params = {
+                "tables": [{"table": t} for t in selected_tables],
+                "columns": columns_to_select if columns_to_select else None,
+                "conditions": conditions if conditions else None,
+                "limit": limit if limit > 0 else None,
+                "offset": offset if offset > 0 else None,
+                "use_cte": use_cte,
+                "cte_name": cte_name if use_cte else None,
+                "create_temp_table": temp_name if create_temp else None
+            }
+
+            with st.spinner("Generating query..."):
+                result = generate_query(params)
+                if result and result.get('success'):
+                    st.success("Query generated successfully!")
+                    st.session_state.last_query = result['query']
+                else:
+                    st.error(result.get('error', "Failed to generate query"))
+
+        if st.session_state.last_query:
+            st.code(st.session_state.last_query, language="sql")
+
+            # Action buttons
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("✅ Validate"):
+                    validation = validate_query(st.session_state.last_query)
+                    if validation:
+                        if validation['valid']:
+                            st.success("Query is valid!")
+                        else:
+                            st.error("Query has errors")
+                            for err in validation['errors']:
+                                st.warning(err)
+
+            with col2:
+                if st.button("▶️ Execute"):
+                    with st.spinner("Executing query..."):
+                        results = execute_query(st.session_state.last_query)
+                        if results:
+                            st.session_state.query_results = results
+                            st.success("Query executed!")
+                            st.rerun()
+
+# ========== JOIN BUILDER ==========
+
+def show_join_builder():
+    st.title("🔗 Join Builder")
+
+    if len(st.session_state.tables) < 2:
+        st.warning("Need at least 2 tables to build joins")
+        return
+
+    col1, col2 = st.columns([2, 1])
+
+    with col1:
+        st.subheader("Build Join")
+
+        table1 = st.selectbox("First Table", st.session_state.tables, key="join_table1")
+        table2 = st.selectbox("Second Table", st.session_state.tables, key="join_table2")
+
+        join_type = st.selectbox(
+            "Join Type",
+            ["INNER JOIN", "LEFT JOIN", "RIGHT JOIN", "FULL JOIN", "CROSS JOIN"]
+        )
+
+        # Auto-detect relationship
+        rel = None
+        for r in st.session_state.relationships:
+            if (r.get('from_table') == table1 and r.get('to_table') == table2) or \
+               (r.get('from_table') == table2 and r.get('to_table') == table1):
+                rel = r
+                break
+
+        if rel:
+            st.info(f"Detected relationship: {rel.get('from_column')} = {rel.get('to_column')}")
+            condition = f"{rel.get('from_table')}.{rel.get('from_column')} = {rel.get('to_table')}.{rel.get('to_column')}"
+        else:
+            condition = st.text_input("Join Condition (e.g., table1.id = table2.user_id)")
+
+        if st.button("🔨 Build Join", type="primary"):
+            with st.spinner("Building join..."):
+                result = build_join(table1, table2, join_type, condition)
+                if result:
+                    st.success("Join built successfully!")
+                    st.json(result.get('join_info', {}))
+
+    with col2:
+        st.subheader("Available Relationships")
+        if st.session_state.relationships:
+            for rel in st.session_state.relationships[:5]:
+                st.info(f"{rel.get('from_table')}.{rel.get('from_column')} → "
+                       f"{rel.get('to_table')}.{rel.get('to_column')}")
+        else:
+            st.info("No relationships loaded")
+
+# ========== CTE BUILDER ==========
+
+def show_cte_builder():
+    st.title("🔄 CTE Builder")
+
+    col1, col2 = st.columns([2, 1])
+
+    with col1:
+        st.subheader("Create CTE")
+
+        cte_name = st.text_input("CTE Name", "stage_1")
+        cte_query = st.text_area("CTE Query", height=150)
+
+        if st.button("➕ Add CTE", type="primary"):
+            if cte_name and cte_query:
+                result = create_cte(cte_name, cte_query)
+                if result:
+                    st.success(f"CTE '{cte_name}' created!")
+                    if cte_name not in st.session_state.ctes:
+                        st.session_state.ctes.append(cte_name)
+
+        st.markdown("---")
+
+        st.subheader("Final Query")
+        final_query = st.text_area("Final Query (using CTEs)", height=150)
+
+        if st.button("🔨 Build Final Query"):
+            if final_query:
+                # This would need to be implemented in the API
+                st.session_state.last_query = final_query
+                st.success("Final query set!")
+
+    with col2:
+        st.subheader("Active CTEs")
+        if st.session_state.ctes:
+            for cte in st.session_state.ctes:
+                st.info(f"📄 {cte}")
+        else:
+            st.info("No CTEs created yet")
+
+# ========== TEMP TABLES ==========
+
+def show_temp_tables():
+    st.title("📦 Temporary Tables")
+
+    col1, col2 = st.columns([2, 1])
+
+    with col1:
+        st.subheader("Create Temporary Table")
+
+        temp_name = st.text_input("Table Name", "temp_data")
+
+        creation_method = st.radio(
+            "Creation Method",
+            ["From Query", "From Columns", "From DataFrame"]
+        )
+
+        if creation_method == "From Query":
+            temp_query = st.text_area("SQL Query", height=150)
+            if st.button("📊 Create Temp Table", type="primary"):
+                if temp_name and temp_query:
+                    result = create_temp_table(temp_name, query=temp_query)
+                    if result:
+                        st.success(f"Temporary table '{temp_name}' created!")
+                        if temp_name not in st.session_state.temp_tables:
+                            st.session_state.temp_tables.append(temp_name)
+
+        elif creation_method == "From Columns":
+            col_defs = st.text_area("Column Definitions (one per line)",
+                                    "id INT\nname VARCHAR(100)\ncreated_at DATE")
+            if st.button("📊 Create Temp Table", type="primary"):
+                columns = [c.strip() for c in col_defs.split('\n') if c.strip()]
+                result = create_temp_table(temp_name, columns=columns)
+                if result:
+                    st.success(f"Temporary table '{temp_name}' created!")
+                    if temp_name not in st.session_state.temp_tables:
+                        st.session_state.temp_tables.append(temp_name)
+
+        else:  # From DataFrame
+            st.info("Upload a CSV to create temporary table")
+            uploaded_file = st.file_uploader("Choose CSV file", type="csv")
+            if uploaded_file and st.button("📊 Create Temp Table", type="primary"):
+                df = pd.read_csv(uploaded_file)
+                # This would need to be implemented in the API
+                st.success(f"DataFrame loaded with {len(df)} rows")
+
+    with col2:
+        st.subheader("Active Temp Tables")
+        if st.session_state.temp_tables:
+            for temp in st.session_state.temp_tables:
+                st.info(f"📋 {temp}")
+        else:
+            st.info("No temporary tables created")
+
+# ========== VALIDATOR ==========
+
+def show_validator():
+    st.title("✅ Query Validator")
+
+    sql_to_validate = st.text_area(
+        "Enter SQL to validate",
+        value=st.session_state.last_query if st.session_state.last_query else "",
+        height=200
+    )
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        if st.button("🔍 Validate", type="primary"):
+            if sql_to_validate:
+                with st.spinner("Validating..."):
+                    validation = validate_query(sql_to_validate)
+                    if validation:
+                        if validation['valid']:
+                            st.success("✅ Query is valid!")
+                        else:
+                            st.error("❌ Query has errors")
+
+                        if validation.get('errors'):
+                            st.subheader("Errors")
+                            for err in validation['errors']:
+                                st.markdown(f'<div class="error-box">{err}</div>',
+                                          unsafe_allow_html=True)
+
+                        if validation.get('warnings'):
+                            st.subheader("Warnings")
+                            for warn in validation['warnings']:
+                                st.markdown(f'<div class="warning-box">{warn}</div>',
+                                          unsafe_allow_html=True)
+
+    with col2:
+        if st.button("📋 Load Last Query"):
+            if st.session_state.last_query:
+                sql_to_validate = st.session_state.last_query
+                st.rerun()
+
+    with col3:
+        if st.button("🧹 Clear"):
+            st.rerun()
+
+    # Validation Rules
+    with st.expander("📖 Validation Rules"):
+        st.markdown("""
+        - **Tables must exist** in the database
+        - **Columns must exist** in their respective tables
+        - **JOIN conditions** must reference valid columns
+        - **SQL syntax** must be valid
+        - **Aggregate functions** must be used with GROUP BY
+        """)
+
+# ========== RESULTS ==========
+
+def show_results():
+    st.title("📊 Query Results")
+
+    if st.session_state.query_results:
+        data = st.session_state.query_results
+
+        # Display results info
+        if isinstance(data, dict):
+            if 'data' in data:
+                df = pd.DataFrame(data['data'])
+
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Rows", data.get('row_count', len(df)))
+                with col2:
+                    st.metric("Columns", len(df.columns))
+                with col3:
+                    if data.get('truncated'):
+                        st.warning("Results truncated to 1000 rows")
+
+                # Display the data
+                st.dataframe(df, use_container_width=True)
+
+                # Export options
+                st.subheader("Export Results")
+                export_format = st.radio("Format", ["CSV", "JSON"], horizontal=True)
+
+                if export_format == "CSV":
+                    csv = df.to_csv(index=False)
+                    st.download_button(
+                        "📥 Download CSV",
+                        csv,
+                        f"query_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                        "text/csv"
+                    )
+                else:
+                    json_str = df.to_json(orient='records', indent=2)
+                    st.download_button(
+                        "📥 Download JSON",
+                        json_str,
+                        f"query_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                        "application/json"
+                    )
+
+                # Data Visualization
+                if len(df.columns) >= 2:
+                    st.subheader("Quick Visualization")
+                    chart_type = st.selectbox("Chart Type",
+                                             ["Bar Chart", "Line Chart", "Scatter Plot"])
+
+                    x_axis = st.selectbox("X Axis", df.columns)
+                    y_axis = st.selectbox("Y Axis", [c for c in df.columns if c != x_axis])
+
+                    if chart_type == "Bar Chart":
+                        fig = px.bar(df, x=x_axis, y=y_axis)
+                    elif chart_type == "Line Chart":
+                        fig = px.line(df, x=x_axis, y=y_axis)
+                    else:
+                        fig = px.scatter(df, x=x_axis, y=y_axis)
+
+                    st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("No query results yet. Generate and execute a query to see results here.")
+
+# ========== SCHEMA EXPLORER ==========
+
+def show_schema_explorer():
+    st.title("🔍 Schema Explorer")
+
+    if not st.session_state.tables:
+        st.warning("Please load tables first from the sidebar")
+        return
+
+    # Table selector
+    selected_table = st.selectbox("Select Table", st.session_state.tables)
+
+    if selected_table:
+        # Load columns if not already loaded
+        if selected_table not in st.session_state.columns:
+            load_columns(selected_table)
+
+        cols = st.session_state.columns.get(selected_table, [])
+
+        if cols:
+            # Display column information
+            df_columns = pd.DataFrame(cols)
+            st.subheader(f"Columns in {selected_table}")
+            st.dataframe(df_columns, use_container_width=True)
+
+        # Display relationships
+        st.subheader("Relationships")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.markdown("**Foreign Keys (Outgoing)**")
+            outgoing = [r for r in st.session_state.relationships
+                       if r.get('from_table') == selected_table]
+            if outgoing:
+                for rel in outgoing:
+                    st.info(f"→ {rel.get('to_table')}.{rel.get('to_column')}")
+            else:
+                st.info("No outgoing relationships")
+
+        with col2:
+            st.markdown("**Referenced By (Incoming)**")
+            incoming = [r for r in st.session_state.relationships
+                       if r.get('to_table') == selected_table]
+            if incoming:
+                for rel in incoming:
+                    st.info(f"← {rel.get('from_table')}.{rel.get('from_column')}")
+            else:
+                st.info("No incoming relationships")
+
+        # Sample query
+        with st.expander("📝 Sample Query"):
+            sample_query = f"SELECT * FROM {selected_table} LIMIT 10"
+            st.code(sample_query, language="sql")
+            if st.button("Try Sample Query"):
+                params = {
+                    "tables": [{"table": selected_table}],
+                    "limit": 10
+                }
+                result = generate_query(params)
+                if result:
+                    st.success("Sample query generated!")
+
+# ========== RUN APP ==========
 
 if __name__ == "__main__":
-    main()
     main()
