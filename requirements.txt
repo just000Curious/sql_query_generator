@@ -1,4 +1,0 @@
-streamlit~=1.54.0
-pandas~=2.3.3
-plotly~=6.6.0
-PyPika~=0.51.1

@@ -1,0 +1,10 @@
+pypika
+pandas
+sqlparse
+streamlit
+openpyxl
+xlrd
+psycopg2-binary
+pymysql
+pyodbc
+sqlalchemy

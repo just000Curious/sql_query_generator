@@ -171,3 +171,52 @@ class TemporaryTableManager:
         parts.append(main_query)
 
         return "\n\n".join(parts)
+
+
+# ========== WRAPPER FUNCTIONS FOR COMPATIBILITY ==========
+# These functions make the module compatible with the test script
+
+_manager = TemporaryTableManager()
+
+
+def create_temp_table(name: str, columns: List[str] = None):
+    """
+    Wrapper function to create a temporary table
+    Compatible with test.py
+    """
+    if columns:
+        # Convert column definitions to a SELECT query
+        col_defs = ", ".join(columns)
+        query = f"SELECT {col_defs} WHERE 1=0"  # Empty table with correct schema
+    else:
+        query = "SELECT 1 WHERE 1=0"
+
+    return _manager.create_temp_table(name, query)
+
+
+def drop_temp_table(name: str):
+    """
+    Wrapper function to drop a temporary table
+    """
+    _manager.drop_temp_table(name)
+
+
+def get_temp_table(name: str):
+    """
+    Wrapper function to get a temporary table
+    """
+    return _manager.get_temp_table(name)
+
+
+def list_temp_tables():
+    """
+    Wrapper function to list all temporary tables
+    """
+    return _manager.list_temp_tables()
+
+
+def create_cte(name: str, query_gen):
+    """
+    Wrapper function to create a CTE
+    """
+    return _manager.create_cte(name, query_gen)
