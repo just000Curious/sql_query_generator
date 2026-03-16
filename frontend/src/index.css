@@ -1,0 +1,102 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 222 47% 11%;
+    --foreground: 210 40% 90%;
+
+    --card: 217 33% 15%;
+    --card-foreground: 210 40% 90%;
+
+    --popover: 217 33% 15%;
+    --popover-foreground: 210 40% 90%;
+
+    --primary: 187 72% 60%;
+    --primary-foreground: 222 47% 11%;
+
+    --secondary: 215 25% 22%;
+    --secondary-foreground: 210 40% 90%;
+
+    --muted: 215 25% 18%;
+    --muted-foreground: 215 16% 57%;
+
+    --accent: 187 72% 60%;
+    --accent-foreground: 222 47% 11%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 215 25% 25%;
+    --input: 215 25% 25%;
+    --ring: 187 72% 60%;
+
+    --radius: 0.375rem;
+
+    --sidebar-background: 222 47% 9%;
+    --sidebar-foreground: 215 16% 57%;
+    --sidebar-primary: 187 72% 60%;
+    --sidebar-primary-foreground: 222 47% 11%;
+    --sidebar-accent: 215 25% 18%;
+    --sidebar-accent-foreground: 210 40% 90%;
+    --sidebar-border: 215 25% 20%;
+    --sidebar-ring: 187 72% 60%;
+
+    /* Custom tokens */
+    --surface-0: 222 47% 11%;
+    --surface-1: 217 33% 15%;
+    --surface-2: 215 25% 18%;
+    --surface-3: 215 25% 22%;
+    --text-primary: 210 40% 90%;
+    --text-secondary: 215 16% 57%;
+    --cyan: 187 72% 60%;
+    --cyan-dim: 187 50% 35%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'IBM Plex Sans', sans-serif;
+  }
+
+  code, pre, .mono {
+    font-family: 'IBM Plex Mono', monospace;
+  }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: hsl(var(--surface-0));
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--surface-3));
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground));
+}
+
+/* Monaco editor overrides */
+.monaco-editor .cursor {
+  color: hsl(var(--cyan)) !important;
+}
+
+/* React Flow overrides */
+.react-flow__node {
+  font-family: 'IBM Plex Mono', monospace;
+}
