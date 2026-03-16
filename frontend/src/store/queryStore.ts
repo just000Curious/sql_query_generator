@@ -63,6 +63,9 @@ interface QueryStore {
   sessionId: string | null;
   setSessionId: (id: string | null) => void;
 
+  selectedSchema: string | null;
+  setSelectedSchema: (schema: string | null) => void;
+
   selectedTables: SelectedTable[];
   addTable: (t: SelectedTable) => void;
   removeTable: (table: string) => void;
@@ -127,6 +130,7 @@ interface QueryStore {
 
 const initialState = {
   sessionId: null,
+  selectedSchema: null as string | null,
   selectedTables: [] as SelectedTable[],
   selectedColumns: [] as SelectedColumn[],
   joins: [] as JoinDef[],
@@ -148,6 +152,13 @@ const initialState = {
 export const useQueryStore = create<QueryStore>((set) => ({
   ...initialState,
   setSessionId: (id) => set({ sessionId: id }),
+  setSelectedSchema: (schema) => set({
+    selectedSchema: schema,
+    selectedTables: [],
+    selectedColumns: [],
+    joins: [],
+    filters: [],
+  }),
   addTable: (t) => set((s) => ({ selectedTables: [...s.selectedTables, t] })),
   removeTable: (table) => set((s) => ({
     selectedTables: s.selectedTables.filter((t) => t.table !== table),
