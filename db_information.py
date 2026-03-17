@@ -1000,8 +1000,8 @@ def _get_default_db_info(csv_file_path: str = None):
             import os
             if os.path.exists("master_db_schema.csv"):
                 _default_db_info = CSVDBInfo("master_db_schema.csv")
-            elif os.path.exists("master_db_schema (1).csv"):
-                _default_db_info = CSVDBInfo("master_db_schema (1).csv")
+            elif os.path.exists("master_db_schema.csv"):
+                _default_db_info = CSVDBInfo("master_db_schema.csv")
             else:
                 _default_db_info = CSVDBInfo()  # Use test data
     return _default_db_info
