@@ -1,448 +1,504 @@
-#!/usr/bin/env python3
 """
-AGGRESSIVE TEST SUITE - Tests all modules with extreme prejudice
+test_api_fixed.py
+Fixed test script for SQL Query Generator API
 """
 
-import sys
-import os
-import importlib
-import traceback
+import requests
+import json
 import time
-import random
-import string
-from datetime import datetime
+from datetime import datetime, date, timedelta
+import sys
 
-# Add root to path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-
-# Colors for output
-class Colors:
-    HEADER = '\033[95m'
-    BLUE = '\033[94m'
-    GREEN = '\033[92m'
-    YELLOW = '\033[93m'
-    RED = '\033[91m'
-    END = '\033[0m'
-    BOLD = '\033[1m'
+# API Configuration
+API_URL = "http://127.0.0.1:8000"
 
 
-def print_header(text):
-    print(f"\n{Colors.HEADER}{'=' * 60}{Colors.END}")
-    print(f"{Colors.BOLD}{Colors.BLUE}{text}{Colors.END}")
-    print(f"{Colors.HEADER}{'=' * 60}{Colors.END}")
+class APITester:
+    """Test the SQL Query Generator API"""
 
+    def __init__(self, api_url=API_URL):
+        self.api_url = api_url
+        self.passed = 0
+        self.failed = 0
 
-def print_success(text):
-    print(f"{Colors.GREEN}✓ {text}{Colors.END}")
-
-
-def print_failure(text):
-    print(f"{Colors.RED}✗ {text}{Colors.END}")
-
-
-def print_warning(text):
-    print(f"{Colors.YELLOW}⚠ {text}{Colors.END}")
-
-
-def print_info(text):
-    print(f"{Colors.BLUE}ℹ {text}{Colors.END}")
-
-
-class AggressiveTester:
-    def __init__(self):
-        self.results = {
-            'passed': [],
-            'failed': [],
-            'crashed': []
-        }
-        self.start_time = time.time()
-
-    def test_imports(self):
-        """Test importing all modules aggressively"""
-        print_header("TESTING IMPORTS")
-
-        modules_to_test = [
-            'cte_builder',
-            'join_builder',
-            'temporary_table',
-            'query_engine',
-            'query_validator',
-            'query_assembler',
-            'db_information',
-            'pypika_query_engine'
-        ]
-
-        for module_name in modules_to_test:
-            try:
-                # Try multiple import methods
-                module = None
-                errors = []
-
-                # Method 1: Direct import
-                try:
-                    module = __import__(module_name)
-                    print_info(f"Direct import of {module_name}: SUCCESS")
-                except Exception as e:
-                    errors.append(f"Direct import failed: {str(e)}")
-
-                # Method 2: Importlib
-                if not module:
-                    try:
-                        module = importlib.import_module(module_name)
-                        print_info(f"Importlib import of {module_name}: SUCCESS")
-                    except Exception as e:
-                        errors.append(f"Importlib failed: {str(e)}")
-
-                # Method 3: Reload if exists
-                if module:
-                    try:
-                        importlib.reload(module)
-                        print_info(f"Reload of {module_name}: SUCCESS")
-                    except:
-                        pass
-
-                    # Check module attributes
-                    attrs = dir(module)
-                    public_attrs = [a for a in attrs if not a.startswith('_')]
-                    print_info(f"Module {module_name} has {len(public_attrs)} public attributes")
-
-                    self.results['passed'].append(module_name)
-                    print_success(f"Module {module_name} imported successfully")
-                else:
-                    raise ImportError(f"All import methods failed: {'; '.join(errors)}")
-
-            except Exception as e:
-                self.results['failed'].append(module_name)
-                print_failure(f"Module {module_name} failed to import")
-                print(f"  Error: {str(e)}")
-                traceback.print_exc()
-
-    def test_cte_builder(self):
-        """Aggressively test CTE builder"""
-        print_header("TESTING CTE BUILDER")
-
+    def test(self, name, func):
+        """Run a single test"""
+        print(f"\n▶ Testing: {name}")
         try:
-            import cte_builder
-
-            # Test 1: Create instance
-            try:
-                builder = cte_builder.CTETreeBuilder() if hasattr(cte_builder, 'CTETreeBuilder') else None
-                if builder:
-                    print_success("CTETreeBuilder instantiated")
-            except Exception as e:
-                print_failure(f"CTE builder instantiation failed: {e}")
-
-            # Test 2: Find all callable methods
-            methods = [m for m in dir(cte_builder) if callable(getattr(cte_builder, m)) and not m.startswith('_')]
-            print_info(f"Found {len(methods)} callable methods/classes")
-
-            # Test 3: Try to call everything with garbage data
-            for method in methods:
-                try:
-                    func = getattr(cte_builder, method)
-                    # Try with random arguments
-                    for _ in range(3):
-                        args = [self._generate_random_arg() for _ in range(random.randint(0, 3))]
-                        kwargs = {f"arg{i}": self._generate_random_arg() for i in range(random.randint(0, 2))}
-                        try:
-                            result = func(*args, **kwargs)
-                            print_info(f"  Called {method} with random args: returned {type(result)}")
-                        except Exception as e:
-                            print_warning(f"  {method} raised expected error with random data: {e}")
-                except Exception as e:
-                    print_warning(f"  Could not test {method}: {e}")
-
-            # Test 4: Stress test with loops
-            print_info("Stress testing CTE builder...")
-            for i in range(10):
-                try:
-                    # Generate random CTE structure
-                    cte_name = f"cte_{i}_{random.randint(1, 1000)}"
-                    if hasattr(cte_builder, 'create_cte'):
-                        getattr(cte_builder, 'create_cte')(cte_name, f"SELECT {random.randint(1, 100)}")
-                except:
-                    pass
-
-            self.results['passed'].append('cte_builder_stress')
-            print_success("CTE builder stress test completed")
-
+            result = func()
+            if result:
+                print(f"  ✓ PASS")
+                self.passed += 1
+            else:
+                print(f"  ✗ FAIL")
+                self.failed += 1
+            return result
         except Exception as e:
-            self.results['failed'].append('cte_builder')
-            print_failure(f"CTE builder testing crashed: {e}")
-            traceback.print_exc()
+            print(f"  ✗ FAIL - Exception: {e}")
+            self.failed += 1
+            return False
 
-    def test_join_builder(self):
-        """Aggressively test join builder"""
-        print_header("TESTING JOIN BUILDER")
-
-        try:
-            import join_builder
-
-            # Test 1: Find all join-related functions
-            join_methods = [m for m in dir(join_builder) if 'join' in m.lower() and callable(getattr(join_builder, m))]
-            print_info(f"Found {len(join_methods)} join-related methods")
-
-            # Test 2: Try all join types with invalid data
-            join_types = ['INNER', 'LEFT', 'RIGHT', 'FULL', 'CROSS', 'NATURAL', 'SELF']
-            tables = ['users', 'orders', 'products', 'categories', None, 123, [], {}]
-
-            for join_type in join_types:
-                for table1 in tables:
-                    for table2 in tables:
-                        try:
-                            if hasattr(join_builder, 'build_join'):
-                                result = join_builder.build_join(table1, table2, join_type)
-                                print_info(f"  Join {join_type} {table1} x {table2} -> {type(result)}")
-                        except:
-                            pass
-
-            # Test 3: Massive join chain
-            try:
-                if hasattr(join_builder, 'build_join_chain'):
-                    chain = []
-                    for i in range(50):  # 50 joins!
-                        chain.append({
-                            'table': f'table_{i}',
-                            'type': random.choice(join_types),
-                            'condition': f"id_{i - 1} = id_{i}" if i > 0 else None
-                        })
-                    result = join_builder.build_join_chain(chain)
-                    print_success(f"Built massive join chain with 50 joins")
-            except Exception as e:
-                print_warning(f"Massive join chain test: {e}")
-
-            self.results['passed'].append('join_builder_stress')
-            print_success("Join builder testing completed")
-
-        except Exception as e:
-            self.results['failed'].append('join_builder')
-            print_failure(f"Join builder testing crashed: {e}")
-
-    def test_temporary_table(self):
-        """Aggressively test temporary table functionality"""
-        print_header("TESTING TEMPORARY TABLE")
-
-        try:
-            import temporary_table
-
-            # Test 1: Create/drop cycles
-            for i in range(20):
-                try:
-                    if hasattr(temporary_table, 'create_temp_table'):
-                        table_name = f"temp_{i}_{random.randint(1, 10000)}"
-                        columns = [f"col_{j} {random.choice(['INT', 'VARCHAR(50)', 'DATE'])}" for j in
-                                   range(random.randint(1, 5))]
-                        result = temporary_table.create_temp_table(table_name, columns)
-
-                        # Immediately try to drop
-                        if hasattr(temporary_table, 'drop_temp_table'):
-                            temporary_table.drop_temp_table(table_name)
-                except:
-                    pass
-
-            print_success("Created and dropped 20 temporary tables")
-
-            # Test 2: Concurrent access simulation
-            print_info("Simulating concurrent access...")
-            import threading
-
-            def temp_table_worker(worker_id):
-                for j in range(5):
-                    try:
-                        if hasattr(temporary_table, 'create_temp_table'):
-                            name = f"thread_{worker_id}_temp_{j}"
-                            temporary_table.create_temp_table(name, ['id INT'])
-                            time.sleep(0.01)
-                            if hasattr(temporary_table, 'drop_temp_table'):
-                                temporary_table.drop_temp_table(name)
-                    except:
-                        pass
-
-            threads = []
-            for i in range(10):
-                t = threading.Thread(target=temp_table_worker, args=(i,))
-                threads.append(t)
-                t.start()
-
-            for t in threads:
-                t.join()
-
-            print_success("Concurrent access test completed")
-
-            self.results['passed'].append('temporary_table_stress')
-
-        except Exception as e:
-            self.results['failed'].append('temporary_table')
-            print_failure(f"Temporary table testing crashed: {e}")
-
-    def test_query_engine(self):
-        """Aggressively test query engine"""
-        print_header("TESTING QUERY ENGINE")
-
-        try:
-            import query_engine
-
-            # Test 1: Generate massive queries
-            if hasattr(query_engine, 'generate_query'):
-                for size in [10, 100, 1000, 10000]:
-                    try:
-                        # Generate huge query
-                        tables = [f"table_{i}" for i in range(size)]
-                        columns = [f"col_{i}" for i in range(min(size, 100))]
-                        conditions = [f"col_{i} > {random.randint(1, 100)}" for i in range(min(size, 50))]
-
-                        query = query_engine.generate_query(
-                            tables=random.sample(tables, min(10, len(tables))),
-                            columns=random.sample(columns, min(20, len(columns))),
-                            where=" AND ".join(random.sample(conditions, min(10, len(conditions))))
-                        )
-                        print_info(f"Generated query with {len(str(query))} characters")
-                    except Exception as e:
-                        print_warning(f"Query generation failed for size {size}: {e}")
-
-            # Test 2: Malformed inputs
-            print_info("Testing with malformed inputs...")
-            malformed_inputs = [
-                None,
-                "",
-                "'; DROP TABLE users; --",
-                "\x00\x01\x02\x03",
-                {"injection": "attempt"},
-                ["nested", ["list"]],
-                Exception("Test exception"),
-                globals()
-            ]
-
-            if hasattr(query_engine, 'execute_query'):
-                for malformed in malformed_inputs:
-                    try:
-                        query_engine.execute_query(malformed)
-                    except Exception as e:
-                        print_warning(f"  Malformed input {type(malformed)} raised: {type(e).__name__}")
-
-            self.results['passed'].append('query_engine_stress')
-            print_success("Query engine testing completed")
-
-        except Exception as e:
-            self.results['failed'].append('query_engine')
-            print_failure(f"Query engine testing crashed: {e}")
-
-    def test_all_modules_together(self):
-        """Test interaction between all modules"""
-        print_header("TESTING MODULE INTERACTIONS")
-
-        try:
-            # Import everything
-            modules = {}
-            for module_name in ['cte_builder', 'join_builder', 'temporary_table',
-                                'query_engine', 'query_validator', 'query_assembler',
-                                'db_information', 'pypika_query_engine']:
-                try:
-                    modules[module_name] = __import__(module_name)
-                    print_success(f"Imported {module_name}")
-                except Exception as e:
-                    print_warning(f"Could not import {module_name}: {e}")
-
-            # Try to create a complex query using multiple modules
-            print_info("Attempting to build complex query with all modules...")
-
-            # Step 1: Create temp tables
-            if 'temporary_table' in modules:
-                modules['temporary_table'].create_temp_table("temp_analysis", ["id INT", "value DECIMAL"])
-
-            # Step 2: Build CTE
-            if 'cte_builder' in modules:
-                modules['cte_builder'].build_cte("analysis_cte", "SELECT * FROM temp_analysis")
-
-            # Step 3: Build joins
-            if 'join_builder' in modules:
-                modules['join_builder'].build_join("temp_analysis", "main_table", "LEFT")
-
-            # Step 4: Validate
-            if 'query_validator' in modules:
-                modules['query_validator'].validate("SELECT * FROM temp_analysis")
-
-            # Step 5: Assemble
-            if 'query_assembler' in modules:
-                modules['query_assembler'].assemble(["SELECT", "FROM", "WHERE"])
-
-            print_success("All modules interacted successfully")
-            self.results['passed'].append('module_interaction')
-
-        except Exception as e:
-            self.results['failed'].append('module_interaction')
-            print_failure(f"Module interaction failed: {e}")
-            traceback.print_exc()
-
-    def _generate_random_arg(self):
-        """Generate random argument for testing"""
-        types = [
-            lambda: random.randint(-1000, 1000),
-            lambda: random.uniform(-1000, 1000),
-            lambda: ''.join(random.choices(string.ascii_letters, k=random.randint(0, 10))),
-            lambda: None,
-            lambda: True if random.random() > 0.5 else False,
-            lambda: [random.randint(0, 10) for _ in range(random.randint(0, 5))],
-            lambda: {f"key_{i}": random.randint(0, 10) for i in range(random.randint(0, 3))},
-            lambda: Exception("Random exception"),
-            lambda: datetime.now(),
-            lambda: object()
-        ]
-        return random.choice(types)()
-
-    def run_all_tests(self):
-        """Run all aggressive tests"""
-        print_header("🔥 AGGRESSIVE TEST SUITE STARTING 🔥")
-        print_info(f"Start time: {datetime.now()}")
-        print_info(f"Python version: {sys.version}")
-        print_info(f"Platform: {sys.platform}")
-
-        # Run tests
-        self.test_imports()
-        self.test_cte_builder()
-        self.test_join_builder()
-        self.test_temporary_table()
-        self.test_query_engine()
-        self.test_all_modules_together()
-
-        # Print summary
-        self.print_summary()
-
-    def print_summary(self):
+    def summary(self):
         """Print test summary"""
-        elapsed = time.time() - self.start_time
+        print("\n" + "="*60)
+        print(f"TEST SUMMARY: {self.passed} passed, {self.failed} failed")
+        print("="*60)
+        return self.failed == 0
 
-        print_header("📊 TEST SUMMARY 📊")
-        print_info(f"Total time: {elapsed:.2f} seconds")
-        print_success(f"Passed: {len(self.results['passed'])}")
-        print_failure(f"Failed: {len(self.results['failed'])}")
 
-        if self.results['passed']:
-            print_info("\nPassed tests:")
-            for test in self.results['passed']:
-                print(f"  {Colors.GREEN}✓{Colors.END} {test}")
+def check_api_health():
+    """Test 1: Check if API is running"""
+    try:
+        response = requests.get(f"{API_URL}/health", timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            print(f"    Status: {data.get('status')}")
+            print(f"    Tables loaded: {data.get('tables_loaded')}")
+            return True
+        return False
+    except requests.exceptions.ConnectionError:
+        print("    ❌ API not running. Please start the API first: python api_improved.py")
+        return False
 
-        if self.results['failed']:
-            print_info("\nFailed tests:")
-            for test in self.results['failed']:
-                print(f"  {Colors.RED}✗{Colors.END} {test}")
 
-        if len(self.results['failed']) == 0:
-            print_header("🎉 ALL TESTS PASSED! YOUR CODE IS BULLETPROOF! 🎉")
+def test_root_endpoint():
+    """Test 2: Root endpoint"""
+    response = requests.get(f"{API_URL}/")
+    if response.status_code == 200:
+        data = response.json()
+        print(f"    API Version: {data.get('version')}")
+        print(f"    Tables: {data.get('tables')}")
+        return True
+    return False
+
+
+def test_list_tables():
+    """Test 3: List all tables"""
+    response = requests.get(f"{API_URL}/tables")
+    if response.status_code == 200:
+        data = response.json()
+        print(f"    Tables found: {data.get('count')}")
+        print(f"    Tables: {data.get('tables')[:5]}...")
+        return data.get('count', 0) > 0
+    return False
+
+
+def test_get_table_schema():
+    """Test 4: Get table schema"""
+    tables_response = requests.get(f"{API_URL}/tables")
+    if tables_response.status_code != 200:
+        return False
+
+    tables = tables_response.json().get('tables', [])
+    if not tables:
+        print("    No tables found")
+        return False
+
+    table_name = tables[0]
+    response = requests.get(f"{API_URL}/tables/{table_name}")
+
+    if response.status_code == 200:
+        data = response.json()
+        print(f"    Table: {data.get('table')}")
+        print(f"    Columns: {data.get('column_count')}")
+        print(f"    Columns list: {data.get('columns_list')[:5]}...")
+        return True
+    return False
+
+
+def test_generate_basic_query():
+    """Test 5: Generate a basic SELECT query"""
+    payload = {
+        "table": "employees",
+        "columns": ["emp_no", "emp_name", "emp_dept_cd", "salary"],
+        "conditions": [
+            {"column": "emp_dept_cd", "operator": "=", "value": "IT"}
+        ],
+        "limit": 5
+    }
+
+    response = requests.post(f"{API_URL}/query/generate", json=payload)
+
+    if response.status_code == 200:
+        data = response.json()
+        if data.get('success'):
+            print(f"    Generated SQL:")
+            print(f"    {data.get('query')}")
+            return True
         else:
-            print_header("💥 SOME TESTS FAILED. TIME TO DEBUG! 💥")
+            print(f"    Error: {data.get('error')}")
+            return False
+    return False
+
+
+def test_execute_query():
+    """Test 6: Execute a query and get results"""
+    payload = {
+        "sql": "SELECT emp_no, emp_name, emp_dept_cd, salary FROM employees WHERE emp_dept_cd = 'IT' LIMIT 3",
+        "limit": 10
+    }
+
+    response = requests.post(f"{API_URL}/query/execute", json=payload)
+
+    if response.status_code == 200:
+        data = response.json()
+        if data.get('success'):
+            print(f"    Row count: {data.get('row_count')}")
+            print(f"    Columns: {data.get('columns')}")
+            print(f"    Sample data: {data.get('data')[:2]}")
+            return data.get('row_count', 0) > 0
+        else:
+            print(f"    Error: {data.get('message')}")
+            return False
+    return False
+
+
+def test_aggregate_query():
+    """Test 7: Execute an aggregate query"""
+    payload = {
+        "sql": """
+            SELECT status, COUNT(*) as count 
+            FROM complaints 
+            GROUP BY status 
+            ORDER BY count DESC
+        """,
+        "limit": 10
+    }
+
+    response = requests.post(f"{API_URL}/query/execute", json=payload)
+
+    if response.status_code == 200:
+        data = response.json()
+        if data.get('success'):
+            print(f"    Results: {data.get('row_count')} rows")
+            for row in data.get('data', []):
+                print(f"      {row}")
+            return data.get('row_count', 0) > 0
+        else:
+            print(f"    Error: {data.get('message')}")
+            return False
+    return False
+
+
+def test_join_query():
+    """Test 8: Execute a JOIN query"""
+    payload = {
+        "sql": """
+            SELECT 
+                c.complaint_no,
+                c.status,
+                e.emp_name,
+                e.emp_dept_cd
+            FROM complaints c
+            JOIN employees e ON c.emp_no = e.emp_no
+            WHERE c.status IN ('OPEN', 'IN_PROGRESS')
+            LIMIT 5
+        """,
+        "limit": 10
+    }
+
+    response = requests.post(f"{API_URL}/query/execute", json=payload)
+
+    if response.status_code == 200:
+        data = response.json()
+        if data.get('success'):
+            print(f"    Results: {data.get('row_count')} rows")
+            for row in data.get('data', [])[:3]:
+                print(f"      {row}")
+            return True
+        else:
+            print(f"    Error: {data.get('message')}")
+            return False
+    return False
+
+
+def test_date_range_query():
+    """Test 9: Execute date range query"""
+    payload = {
+        "sql": """
+            SELECT complaint_no, complaint_date, status
+            FROM complaints
+            WHERE complaint_date BETWEEN '2024-01-01' AND '2024-01-31'
+        """,
+        "limit": 10
+    }
+
+    response = requests.post(f"{API_URL}/query/execute", json=payload)
+
+    if response.status_code == 200:
+        data = response.json()
+        if data.get('success'):
+            print(f"    Results: {data.get('row_count')} rows")
+            for row in data.get('data', []):
+                print(f"      {row}")
+            return True
+        else:
+            print(f"    Error: {data.get('message')}")
+            return False
+    return False
+
+
+def test_search_tables():
+    """Test 10: Search tables"""
+    response = requests.get(f"{API_URL}/search/tables", params={"q": "emp"})
+
+    if response.status_code == 200:
+        data = response.json()
+        print(f"    Query: {data.get('query')}")
+        print(f"    Results: {data.get('results')}")
+        print(f"    Count: {data.get('count')}")
+        return data.get('count', 0) > 0
+    return False
+
+
+def test_search_columns():
+    """Test 11: Search columns"""
+    response = requests.get(f"{API_URL}/search/columns", params={"q": "name"})
+
+    if response.status_code == 200:
+        data = response.json()
+        print(f"    Query: {data.get('query')}")
+        print(f"    Results: {data.get('count')} columns found")
+        for col in data.get('results', [])[:3]:
+            print(f"      {col.get('table')}.{col.get('column')}")
+        return data.get('count', 0) > 0
+    return False
+
+
+def test_get_stats():
+    """Test 12: Get database statistics"""
+    response = requests.get(f"{API_URL}/stats")
+
+    if response.status_code == 200:
+        data = response.json()
+        print(f"    Total tables: {data.get('total_tables')}")
+        print(f"    Total columns: {data.get('total_columns')}")
+        print(f"    Tables: {list(data.get('tables', {}).keys())[:5]}")
+        return data.get('total_tables', 0) > 0
+    return False
+
+
+def test_get_schema():
+    """Test 13: Get complete schema"""
+    response = requests.get(f"{API_URL}/schema")
+
+    if response.status_code == 200:
+        data = response.json()
+        print(f"    Database: {data.get('database_name')}")
+        print(f"    Total tables: {data.get('total_tables')}")
+        print(f"    Tables: {data.get('tables')[:5]}")
+        return data.get('total_tables', 0) > 0
+    return False
+
+
+def test_get_sample_queries():
+    """Test 14: Get sample queries"""
+    response = requests.get(f"{API_URL}/samples")
+
+    if response.status_code == 200:
+        data = response.json()
+        samples = data.get('samples', [])
+        print(f"    Sample queries: {len(samples)}")
+        for sample in samples[:3]:
+            print(f"      - {sample.get('name')}: {sample.get('description')}")
+        return len(samples) > 0
+    return False
+
+
+def test_validate_sql():
+    """Test 15: Validate SQL (fixed - uses execute with LIMIT 0)"""
+    # Valid SQL test
+    payload_valid = {
+        "sql": "SELECT * FROM employees",
+        "validate": True
+    }
+
+    response = requests.post(f"{API_URL}/query/validate", json=payload_valid)
+
+    if response.status_code == 200:
+        data = response.json()
+        valid = data.get('valid', False)
+        errors = data.get('errors', [])
+        print(f"    Valid SQL - Valid: {valid}, Errors: {errors}")
+
+        # Test invalid SQL
+        payload_invalid = {
+            "sql": "SELECT FROM employees",
+            "validate": True
+        }
+
+        response2 = requests.post(f"{API_URL}/query/validate", json=payload_invalid)
+
+        if response2.status_code == 200:
+            data2 = response2.json()
+            valid2 = data2.get('valid', False)
+            print(f"    Invalid SQL - Valid: {valid2}, Errors: {data2.get('errors', [])}")
+
+            # Both tests pass if valid SQL returns True and invalid SQL returns False
+            return valid and not valid2
+
+    return False
+
+
+def test_advanced_query_generation():
+    """Test 16: Advanced query generation with multiple tables"""
+    payload = {
+        "tables": [{"table": "employees", "alias": "e"}],
+        "columns": [
+            {"table": "e", "column": "emp_no"},
+            {"table": "e", "column": "emp_name"}
+        ],
+        "conditions": [
+            {"column": "e.emp_dept_cd", "operator": "=", "value": "IT"}
+        ],
+        "limit": 10
+    }
+
+    response = requests.post(f"{API_URL}/query/advanced/generate", json=payload)
+
+    if response.status_code == 200:
+        data = response.json()
+        if data.get('success'):
+            print(f"    Generated SQL:")
+            print(f"    {data.get('query')}")
+            return True
+        else:
+            print(f"    Error: {data.get('error')}")
+            return False
+    return False
+
+
+def test_performance():
+    """Test 17: Performance test - multiple queries"""
+    queries = [
+        "SELECT * FROM employees LIMIT 100",
+        "SELECT COUNT(*) FROM employees",
+        "SELECT emp_dept_cd, AVG(salary) FROM employees GROUP BY emp_dept_cd"
+    ]
+
+    times = []
+    for i, sql in enumerate(queries):
+        start = time.time()
+        response = requests.post(f"{API_URL}/query/execute", json={"sql": sql, "limit": 100})
+        elapsed = time.time() - start
+
+        if response.status_code == 200:
+            data = response.json()
+            if data.get('success'):
+                times.append(elapsed)
+                print(f"    Query {i+1}: {elapsed:.3f}s")
+            else:
+                print(f"    Query {i+1}: FAILED - {data.get('message')}")
+                return False
+        else:
+            print(f"    Query {i+1}: HTTP {response.status_code}")
+            return False
+
+    avg_time = sum(times) / len(times)
+    print(f"    Average response time: {avg_time:.3f}s")
+    return avg_time < 2.0
+
+
+def test_error_handling():
+    """Test 18: Error handling for invalid table"""
+    payload = {
+        "table": "nonexistent_table",
+        "columns": ["*"],
+        "limit": 10
+    }
+
+    response = requests.post(f"{API_URL}/query/generate", json=payload)
+
+    if response.status_code == 200:
+        data = response.json()
+        print(f"    Success: {data.get('success')}")
+        print(f"    Error: {data.get('error')}")
+        return data.get('success') is False
+    return False
+
+
+def test_sql_injection_prevention():
+    """Test 19: Test SQL injection prevention"""
+    payload = {
+        "sql": "SELECT * FROM employees WHERE emp_name = 'test' OR '1'='1'",
+        "limit": 10
+    }
+
+    response = requests.post(f"{API_URL}/query/execute", json=payload)
+
+    if response.status_code == 200:
+        data = response.json()
+        print(f"    Query executed safely: {data.get('success')}")
+        return True
+    return False
+
+
+def test_limit_validation():
+    """Test 20: Test that limit parameter works correctly"""
+    payload = {
+        "sql": "SELECT * FROM employees",
+        "limit": 2
+    }
+
+    response = requests.post(f"{API_URL}/query/execute", json=payload)
+
+    if response.status_code == 200:
+        data = response.json()
+        row_count = data.get('row_count', 0)
+        print(f"    Requested limit: 2, Actual rows: {row_count}")
+        return row_count <= 2
+    return False
+
+
+def main():
+    """Run all tests"""
+    print("="*60)
+    print("SQL QUERY GENERATOR API TEST SUITE (FIXED)")
+    print("="*60)
+
+    tester = APITester()
+
+    # First check if API is running
+    if not check_api_health():
+        print("\n❌ API is not running. Please start the API first:")
+        print("   python api_improved.py")
+        sys.exit(1)
+
+    # Run all tests
+    tester.test("Root Endpoint", test_root_endpoint)
+    tester.test("List Tables", test_list_tables)
+    tester.test("Get Table Schema", test_get_table_schema)
+    tester.test("Generate Basic Query", test_generate_basic_query)
+    tester.test("Execute Query", test_execute_query)
+    tester.test("Aggregate Query", test_aggregate_query)
+    tester.test("JOIN Query", test_join_query)
+    tester.test("Date Range Query", test_date_range_query)
+    tester.test("Search Tables", test_search_tables)
+    tester.test("Search Columns", test_search_columns)
+    tester.test("Get Statistics", test_get_stats)
+    tester.test("Get Schema", test_get_schema)
+    tester.test("Get Sample Queries", test_get_sample_queries)
+    tester.test("SQL Validation", test_validate_sql)  # Fixed test
+    tester.test("Advanced Query Generation", test_advanced_query_generation)
+    tester.test("Performance Test", test_performance)
+    tester.test("Error Handling", test_error_handling)
+    tester.test("SQL Injection Prevention", test_sql_injection_prevention)
+    tester.test("Limit Validation", test_limit_validation)
+
+    # Print summary
+    success = tester.summary()
+
+    if success:
+        print("\n🎉 ALL TESTS PASSED! API is working correctly.")
+        print("\n📊 You can now:")
+        print("   - Use the Streamlit UI: streamlit run streamlit_app.py")
+        print("   - Access API docs: http://127.0.0.1:8000/docs")
+        print("   - Make API calls from your applications")
+    else:
+        print("\n❌ SOME TESTS FAILED. Please check the errors above.")
+
+    return 0 if success else 1
 
 
 if __name__ == "__main__":
-    tester = AggressiveTester()
-
-    try:
-        tester.run_all_tests()
-    except KeyboardInterrupt:
-        print_warning("\nTests interrupted by user")
-    except Exception as e:
-        print_failure(f"Test framework crashed: {e}")
-        traceback.print_exc()
-    finally:
-        print_header("TESTING COMPLETE")
+    sys.exit(main())

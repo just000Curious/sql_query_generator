@@ -1,283 +1,345 @@
-import re
-import pandas as pd
-from typing import List, Dict, Optional, Union, Any, Set, Tuple
-from dataclasses import dataclass, field
+"""
+db_information.py
+Database Information Module - Loads schema from JSON file
+"""
 
-
-@dataclass
-class CSVSchema:
-    """Schema information loaded from CSV file"""
-    tables: Dict[str, Dict] = field(default_factory=dict)
-    columns: List[Dict] = field(default_factory=list)
-    relationships: List[Dict] = field(default_factory=list)
-    table_columns: Dict[str, List[Dict]] = field(default_factory=dict)
-    primary_keys: Dict[str, List[str]] = field(default_factory=dict)
-    foreign_keys: Dict[str, List[Dict]] = field(default_factory=dict)
-    tables_by_schema: Dict[str, List[Dict]] = field(default_factory=dict)
-    columns_by_table: Dict[str, List[Dict]] = field(default_factory=dict)
+import json
+import os
+from typing import Dict, List, Optional, Any, Set, Tuple
+from collections import deque
+import pathlib
 
 
 class CSVDBInfo:
     """
-    Database Information Module - Loads schema from CSV file and provides metadata
+    Database Information Module - Loads schema from JSON file
+    Provides metadata for the SQL Query Generator API
     """
 
-    def __init__(self, csv_file_path: str = None):
+    def __init__(self, json_file_path: str = r"G:\sql query generator\db_files\metadata.json"):
         """
-        Load schema from CSV file
+        Load schema from JSON file
 
         Args:
-            csv_file_path: Path to the CSV schema file
+            json_file_path: Path to the JSON schema file (metadata.json)
         """
-        self.csv_file_path = csv_file_path
-        self.schema = CSVSchema()
-        self.schemas: Set[str] = set()
+        self.json_file_path = json_file_path
 
-        # Category mapping for business grouping
+        # Simple storage structures
+        self.schemas: Set[str] = set()
+        self.tables: Dict[str, List[str]] = {}
+        self.columns: Dict[str, List[Dict]] = {}
+        self.table_full_names: Dict[str, str] = {}
+        self.table_schema: Dict[str, str] = {}
+
+        # Category mapping
         self.category_map = {
-            "gm": "General Management",
-            "hm": "Healthcare Management",
-            "pm": "Personnel Management",
-            "pmm": "Personnel Management",
-            "sa": "Sales & Admin",
-            "si": "System Integration",
-            "ta": "Taxation & Finance",
-            "tatk": "Taxation & Finance",
-            "fam": "Financial Management",
-            "rms": "Resource Management",
-            "qrs": "Quality & Reporting"
+            "GM": "General Management",
+            "HM": "Healthcare Management",
+            "PM": "Personnel Management",
+            "SI": "System Integration",
+            "SA": "Sales & Admin",
+            "TA": "Taxation & Finance"
         }
 
-        if csv_file_path:
+        # Target schemas
+        self.target_schemas = {'GM', 'HM', 'PM', 'SI', 'SA', 'TA'}
+
+        # Store raw data
+        self.raw_tables: Dict[str, Dict] = {}
+        self.relationships: List[Dict] = []
+        self.primary_keys: Dict[str, List[str]] = {}
+        self.foreign_keys: Dict[str, List[Dict]] = {}
+        self.composite_keys: Dict[str, List[str]] = {}
+
+        # Track counts
+        self.loaded_tables_count = 0
+        self.all_tables_in_json = {}
+
+        # Check if JSON file exists
+        if json_file_path and os.path.exists(json_file_path):
             try:
-                self._load_from_csv(csv_file_path)
-                print(f"✅ Loaded schema from {csv_file_path}")
+                print(f"📂 Loading schema from: {json_file_path}")
+                self._load_all_tables_from_json(json_file_path)
+                print(f"✅ Successfully loaded {self.loaded_tables_count} tables")
+                self._print_load_summary()
             except Exception as e:
-                print(f"⚠️ Error loading CSV file: {e}. Using test data.")
+                print(f"⚠️ Error loading JSON file: {e}")
+                import traceback
+                traceback.print_exc()
+                print("⚠️ Falling back to test data")
                 self._init_test_data()
         else:
+            print(f"⚠️ JSON file not found: {json_file_path}")
+            print("⚠️ Using test data")
             self._init_test_data()
 
-        # Pre-cache structures after loading
-        self._precache_structures()
+        print(f"\n📊 Final Stats:")
+        print(f"   - {len(self.schemas)} schemas")
+        print(f"   - {self.loaded_tables_count} total tables")
+        print(f"   - {len(self.relationships)} relationships")
 
-        print(f"📊 Loaded {len(self.schema.tables)} tables with {len(self.schema.columns)} columns")
-        print(f"🔗 Found {len(self.schema.relationships)} relationships")
-        print(f"📁 Found {len(self.schemas)} schemas")
+    def _load_all_tables_from_json(self, json_file_path: str):
+        """Load ALL tables from JSON file"""
+        with open(json_file_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
 
-    # -------------------------
-    # CSV LOADING
-    # -------------------------
+        # First, count all tables in JSON
+        total_json_tables = 0
+        for schema_name, schema_data in data.items():
+            if schema_name in self.target_schemas:
+                total_json_tables += len(schema_data)
+                self.all_tables_in_json[schema_name] = len(schema_data)
 
-    def _load_from_csv(self, csv_file_path: str):
-        """Load schema from CSV file"""
-        self.df = pd.read_csv(csv_file_path)
+        print(f"📊 Found {total_json_tables} tables in JSON (target schemas)")
 
-        # Clean column names
-        self.df.columns = [col.strip().lower() for col in self.df.columns]
+        # Process each schema
+        for schema_name, schema_data in data.items():
+            if schema_name not in self.target_schemas:
+                continue
 
-        # Extract schema from table name prefix
-        self.df['schema'] = self.df['table_name'].apply(
-            lambda x: self._extract_prefix(str(x)) if '_' in str(x) else 'public'
-        )
+            print(f"  Loading schema: {schema_name} ({len(schema_data)} tables)")
+            self.schemas.add(schema_name)
+            self.tables[schema_name] = []
 
-        # Build schema structures
-        self._build_from_dataframe(self.df)
+            # Process each table in this schema
+            for table_name, table_info in schema_data.items():
+                full_name = f"{schema_name}.{table_name}"
 
-    def _extract_prefix(self, table_name: str) -> str:
-        """Extract prefix from table name to use as schema"""
-        if '_' in table_name:
-            return table_name.split('_')[0]
-        return 'public'
+                # Store raw table data
+                self.raw_tables[full_name] = table_info
 
-    def _build_from_dataframe(self, df: pd.DataFrame):
-        """Build schema structures from dataframe"""
-        # Group by table
-        for table_name, group in df.groupby('table_name'):
-            table_name = str(table_name).strip()
+                # Add to schema tables list
+                self.tables[schema_name].append(table_name)
 
-            # Get schema from extracted column
-            schema = group.iloc[0]['schema'] if 'schema' in group.columns else 'public'
-            clean_table_name = table_name
+                # Store mapping
+                self.table_full_names[table_name] = full_name
+                self.table_schema[table_name] = schema_name
 
-            if '.' in table_name:
-                parts = table_name.split('.', 1)
-                schema = parts[0].strip()
-                clean_table_name = parts[1].strip()
-                full_name = f"{schema}.{clean_table_name}"
-            else:
-                full_name = clean_table_name
+                # Process columns
+                columns_list = table_info.get('columns', [])
+                keys_info = table_info.get('keys', {})
 
-            self.schemas.add(schema)
+                table_columns = []
+                table_pks = []
+                table_fks = []
 
-            # Store table info
-            self.schema.tables[full_name] = {
-                'name': clean_table_name,
-                'schema': schema,
-                'full_name': full_name,
-                'columns': [],
-                'category': self._get_category(schema)
-            }
-
-            # Process columns
-            table_columns = []
-            primary_keys = []
-            foreign_keys = []
-
-            for _, row in group.iterrows():
-                column_name = str(row['column_name']).strip() if pd.notna(row['column_name']) else ''
-                data_type = str(row['data_type']).strip() if pd.notna(row['data_type']) else 'UNKNOWN'
-                is_nullable = str(row['is_nullable']).strip().upper() == 'YES' if pd.notna(row['is_nullable']) else True
-                is_primary_key = str(row['is_primary_key']).strip().upper() == 'TRUE' if pd.notna(
-                    row['is_primary_key']) else False
-                is_foreign_key = str(row['is_foreign_key']).strip().upper() == 'TRUE' if pd.notna(
-                    row['is_foreign_key']) else False
-
-                column_info = {
-                    'schema_name': schema,
-                    'table_name': clean_table_name,
-                    'column_name': column_name,
-                    'data_type': data_type,
-                    'is_primary_key': is_primary_key,
-                    'is_foreign_key': is_foreign_key,
-                    'is_nullable': is_nullable
-                }
-
-                # Add reference info if available
-                parent_table = row['parent_table'] if pd.notna(row.get('parent_table')) else None
-                parent_column = row['parent_column'] if pd.notna(row.get('parent_column')) else None
-
-                if parent_table and parent_column:
-                    column_info['references_table'] = str(parent_table).strip()
-                    column_info['references_column'] = str(parent_column).strip()
-
-                    # Store relationship
-                    rel = {
-                        'from_schema': schema,
-                        'from_table': clean_table_name,
-                        'from_column': column_name,
-                        'to_schema': schema,
-                        'to_table': str(parent_table).strip(),
-                        'to_column': str(parent_column).strip()
+                # Process each column
+                for column_name in columns_list:
+                    column_info = {
+                        'column_name': column_name,
+                        'data_type': self._infer_data_type(column_name, table_name),
+                        'is_primary_key': False,
+                        'is_foreign_key': False,
+                        'is_nullable': True
                     }
 
-                    # Check if relationship already exists
-                    if rel not in self.schema.relationships:
-                        self.schema.relationships.append(rel)
+                    # Check if column is in keys
+                    if column_name in keys_info:
+                        key_details = keys_info[column_name]
+                        key_type = key_details.get('type', '')
 
-                    # Add to foreign keys list
-                    foreign_keys.append({
-                        'column': column_name,
-                        'references_table': str(parent_table).strip(),
-                        'references_column': str(parent_column).strip(),
-                        'references_schema': schema
-                    })
+                        if key_type == 'PRIMARY KEY':
+                            column_info['is_primary_key'] = True
+                            table_pks.append(column_name)
 
-                self.schema.columns.append(column_info)
-                table_columns.append(column_info)
+                        # Check foreign key
+                        foreign_table = key_details.get('foreign_table')
+                        foreign_column = key_details.get('foreign_column')
 
-                if is_primary_key:
-                    primary_keys.append(column_name)
+                        if foreign_table and foreign_table != '-':
+                            column_info['is_foreign_key'] = True
+                            column_info['references_table'] = foreign_table
+                            column_info['references_column'] = foreign_column
 
-            self.schema.table_columns[full_name] = table_columns
-            if primary_keys:
-                self.schema.primary_keys[full_name] = primary_keys
-            if foreign_keys:
-                self.schema.foreign_keys[full_name] = foreign_keys
+                            # Find schema for referenced table
+                            ref_schema = self._find_schema_for_table(foreign_table, data)
 
-    def _get_category(self, schema: str) -> str:
-        """Get business category for a schema"""
-        # Check for exact match
-        if schema in self.category_map:
-            return self.category_map[schema]
+                            # Store relationship
+                            rel = {
+                                'from_schema': schema_name,
+                                'from_table': table_name,
+                                'from_column': column_name,
+                                'to_schema': ref_schema or schema_name,
+                                'to_table': foreign_table,
+                                'to_column': foreign_column or column_name
+                            }
 
-        # Check for prefix match
-        for prefix, category in self.category_map.items():
-            if schema.startswith(prefix):
-                return category
+                            if rel not in self.relationships:
+                                self.relationships.append(rel)
 
-        return "Other"
+                            table_fks.append({
+                                'column': column_name,
+                                'references_table': foreign_table,
+                                'references_column': foreign_column or column_name,
+                                'references_schema': ref_schema or schema_name
+                            })
 
-    def _precache_structures(self):
-        """Pre-calculate dictionaries for faster access"""
-        # Build tables by schema
-        self.schema.tables_by_schema = {}
-        for full_name, table_info in self.schema.tables.items():
-            schema = table_info['schema']
-            if schema not in self.schema.tables_by_schema:
-                self.schema.tables_by_schema[schema] = []
-            self.schema.tables_by_schema[schema].append(table_info.copy())
+                    table_columns.append(column_info)
 
-        # Build columns by table
-        self.schema.columns_by_table = {}
-        for col_info in self.schema.columns:
-            table_key = f"{col_info['schema_name']}.{col_info['table_name']}"
-            if table_key not in self.schema.columns_by_table:
-                self.schema.columns_by_table[table_key] = []
-            self.schema.columns_by_table[table_key].append(col_info.copy())
+                # Store columns
+                self.columns[full_name] = table_columns
 
-    # -------------------------
-    # TEST DATA INITIALIZATION
-    # -------------------------
+                # Store primary keys
+                if table_pks:
+                    self.primary_keys[full_name] = table_pks
+                    if len(table_pks) > 1:
+                        self.composite_keys[full_name] = table_pks
+
+                # Store foreign keys
+                if table_fks:
+                    self.foreign_keys[full_name] = table_fks
+
+                self.loaded_tables_count += 1
+
+        # Add additional relationships based on common column names
+        self._add_common_column_relationships()
+
+    def _find_schema_for_table(self, table_name: str, data: Dict) -> Optional[str]:
+        """Find which schema contains a given table name"""
+        for schema_name, schema_data in data.items():
+            if schema_name in self.target_schemas and table_name in schema_data:
+                return schema_name
+        return None
+
+    def _add_common_column_relationships(self):
+        """Add relationships based on common column names"""
+        common_columns = ['emp_no', 'complaint_no', 'case_reg_no', 'dept_cd', 'desig_cd']
+
+        for col_name in common_columns:
+            tables_with_col = []
+            for full_name, columns in self.columns.items():
+                for col in columns:
+                    if col['column_name'] == col_name:
+                        schema, table = full_name.split('.')
+                        tables_with_col.append({
+                            'full_name': full_name,
+                            'schema': schema,
+                            'table': table,
+                            'column': col_name
+                        })
+
+            # Create relationships between tables that share this column
+            for i, t1 in enumerate(tables_with_col):
+                for t2 in tables_with_col[i+1:]:
+                    if t1['full_name'] == t2['full_name']:
+                        continue
+
+                    rel = {
+                        'from_schema': t1['schema'],
+                        'from_table': t1['table'],
+                        'from_column': col_name,
+                        'to_schema': t2['schema'],
+                        'to_table': t2['table'],
+                        'to_column': col_name
+                    }
+
+                    # Check if this relationship already exists
+                    exists = False
+                    for existing in self.relationships:
+                        if (existing['from_table'] == rel['from_table'] and
+                            existing['to_table'] == rel['to_table'] and
+                            existing['from_column'] == rel['from_column']):
+                            exists = True
+                            break
+
+                    if not exists:
+                        self.relationships.append(rel)
+
+    def _infer_data_type(self, column_name: str, table_name: str) -> str:
+        """Infer data type from column name patterns"""
+        column_lower = column_name.lower()
+
+        if any(x in column_lower for x in ['date', 'dt', 'timestamp', 'time_stamp']):
+            return 'TIMESTAMP'
+        elif any(x in column_lower for x in ['no', 'num', 'count', 'qty', 'amount', 'amt']):
+            return 'NUMBER'
+        elif any(x in column_lower for x in ['flag', 'status', 'ind', 'type']):
+            return 'VARCHAR(1)'
+        elif 'id' in column_lower or 'code' in column_lower or 'cd' in column_lower:
+            return 'VARCHAR(20)'
+        elif 'file' in column_lower or 'blob' in column_lower:
+            return 'BLOB'
+        elif 'remarks' in column_lower or 'desc' in column_lower:
+            return 'VARCHAR(500)'
+        elif 'name' in column_lower:
+            return 'VARCHAR(100)'
+        else:
+            return 'VARCHAR(100)'
+
+    def _print_load_summary(self):
+        """Print summary of what was loaded"""
+        print("\n" + "=" * 60)
+        print("LOAD SUMMARY")
+        print("=" * 60)
+
+        for schema in sorted(self.schemas):
+            tables = self.tables.get(schema, [])
+            json_count = self.all_tables_in_json.get(schema, 0)
+            print(f"  {schema}: {len(tables)}/{json_count} tables loaded")
+
+        print(f"\n  Total tables loaded: {self.loaded_tables_count}")
+        print(f"  Total relationships: {len(self.relationships)}")
 
     def _init_test_data(self):
-        """Initialize with test data"""
-        # Sample tables from CSV structure
-        test_tables = [
-            ('public', 'gmhk_appointment'),
-            ('public', 'gmhk_complaint_hdr'),
-            ('public', 'gmhk_email_details'),
-            ('pmm', 'employees'),
-            ('pmm', 'departments'),
-            ('fam', 'accounts'),
-            ('fam', 'transactions'),
-            ('rms', 'resources'),
-            ('qrs', 'tickets'),
-        ]
+        """Fallback test data"""
+        test_schemas = ['GM', 'HM', 'PM', 'SI', 'SA', 'TA']
 
-        for schema, table in test_tables:
-            full_name = f"{schema}.{table}" if schema != 'public' else table
+        for schema in test_schemas:
             self.schemas.add(schema)
-            self.schema.tables[full_name] = {
-                'name': table,
-                'schema': schema,
-                'full_name': full_name,
-                'columns': [],
-                'category': self._get_category(schema)
-            }
+            self.tables[schema] = []
 
-        # Sample columns
-        self.schema.columns = [
-            # gmhk_appointment table
-            {'schema_name': 'public', 'table_name': 'gmhk_appointment', 'column_name': 'emp_no',
-             'data_type': 'INTEGER', 'is_primary_key': True, 'is_foreign_key': False, 'is_nullable': False},
-            {'schema_name': 'public', 'table_name': 'gmhk_appointment', 'column_name': 'appointment_date',
-             'data_type': 'DATE', 'is_primary_key': True, 'is_foreign_key': False, 'is_nullable': False},
+        # Sample tables for GM
+        gm_tables = ['gmtk_coms_hdr', 'gmtk_fwd_dtl', 'gmhk_appointment', 'gmtk_dms_blob']
+        for table in gm_tables:
+            self.tables['GM'].append(table)
+            full_name = f"GM.{table}"
+            self.table_full_names[table] = full_name
+            self.table_schema[table] = 'GM'
+            self.columns[full_name] = [
+                {'column_name': 'complaint_no', 'data_type': 'VARCHAR', 'is_primary_key': True, 'is_foreign_key': False},
+                {'column_name': 'emp_no', 'data_type': 'VARCHAR', 'is_primary_key': False, 'is_foreign_key': True},
+                {'column_name': 'status', 'data_type': 'VARCHAR', 'is_primary_key': False, 'is_foreign_key': False},
+                {'column_name': 'reg_date', 'data_type': 'DATE', 'is_primary_key': False, 'is_foreign_key': False}
+            ]
+            self.primary_keys[full_name] = ['complaint_no']
+            self.loaded_tables_count += 1
 
-            # pmm.employees table
-            {'schema_name': 'pmm', 'table_name': 'employees', 'column_name': 'emp_no',
-             'data_type': 'INTEGER', 'is_primary_key': True, 'is_foreign_key': False, 'is_nullable': False},
-            {'schema_name': 'pmm', 'table_name': 'employees', 'column_name': 'department_id',
-             'data_type': 'INTEGER', 'is_primary_key': False, 'is_foreign_key': True, 'is_nullable': False,
-             'references_table': 'departments', 'references_column': 'dept_id'},
+        # Sample tables for HM
+        hm_tables = ['hmt_case_reg', 'hmt_cln_exam', 'hmt_lab_reg', 'hmt_cert_hdr']
+        for table in hm_tables:
+            self.tables['HM'].append(table)
+            full_name = f"HM.{table}"
+            self.table_full_names[table] = full_name
+            self.table_schema[table] = 'HM'
+            self.columns[full_name] = [
+                {'column_name': 'case_reg_no', 'data_type': 'VARCHAR', 'is_primary_key': True, 'is_foreign_key': False},
+                {'column_name': 'emp_no', 'data_type': 'VARCHAR', 'is_primary_key': False, 'is_foreign_key': True},
+                {'column_name': 'patient_name', 'data_type': 'VARCHAR', 'is_primary_key': False, 'is_foreign_key': False},
+                {'column_name': 'visit_no', 'data_type': 'INTEGER', 'is_primary_key': False, 'is_foreign_key': False}
+            ]
+            self.primary_keys[full_name] = ['case_reg_no']
+            self.loaded_tables_count += 1
 
-            # pmm.departments table
-            {'schema_name': 'pmm', 'table_name': 'departments', 'column_name': 'dept_id',
-             'data_type': 'INTEGER', 'is_primary_key': True, 'is_foreign_key': False, 'is_nullable': False},
-        ]
+        # Add more test data as needed...
 
-        # Sample relationships
-        self.schema.relationships = [
-            {'from_schema': 'pmm', 'from_table': 'employees', 'from_column': 'department_id',
-             'to_schema': 'pmm', 'to_table': 'departments', 'to_column': 'dept_id'},
-        ]
+        # Add relationships
+        self._add_test_relationships()
 
-        # Pre-cache test data
-        self._precache_structures()
+    def _add_test_relationships(self):
+        """Add test relationships"""
+        # HM to PM relationship
+        for table in ['hmt_case_reg', 'hmt_cln_exam', 'hmt_lab_reg']:
+            self.relationships.append({
+                'from_schema': 'HM',
+                'from_table': table,
+                'from_column': 'emp_no',
+                'to_schema': 'PM',
+                'to_table': 'pmm_employee',
+                'to_column': 'emp_no'
+            })
 
-    # -------------------------
-    # SCHEMA INFORMATION METHODS
-    # -------------------------
+    # ========== SCHEMA INFORMATION METHODS ==========
 
     def get_schemas(self) -> List[str]:
         """Get all schema names"""
@@ -285,77 +347,70 @@ class CSVDBInfo:
 
     def get_tables(self, schema_name: Optional[str] = None) -> List[str]:
         """Get all table names, optionally filtered by schema"""
-        if schema_name and schema_name in self.schema.tables_by_schema:
-            return [table['name'] for table in self.schema.tables_by_schema[schema_name]]
-
-        tables = []
-        for info in self.schema.tables.values():
-            if schema_name is None or info['schema'] == schema_name:
-                tables.append(info['name'])
-        return sorted(tables)
+        if schema_name:
+            return self.tables.get(schema_name, [])
+        all_tables = []
+        for tables in self.tables.values():
+            all_tables.extend(tables)
+        return sorted(all_tables)
 
     def get_tables_with_schema(self, schema_name: Optional[str] = None) -> List[Dict]:
-        """Get tables with full schema info - uses pre-cached data"""
-        if schema_name and schema_name in self.schema.tables_by_schema:
-            return self.schema.tables_by_schema[schema_name].copy()
-
-        tables = []
-        for info in self.schema.tables.values():
-            if schema_name is None or info['schema'] == schema_name:
-                tables.append(info.copy())
-        return tables
+        """Get tables with schema info"""
+        if schema_name:
+            tables = self.tables.get(schema_name, [])
+            return [{'name': t, 'schema': schema_name, 'full_name': f"{schema_name}.{t}",
+                     'category': self._get_category(schema_name)} for t in tables]
+        result = []
+        for schema, tables in self.tables.items():
+            for table in tables:
+                result.append({'name': table, 'schema': schema, 'full_name': f"{schema}.{table}",
+                               'category': self._get_category(schema)})
+        return result
 
     def table_exists(self, table_name: str, schema_name: Optional[str] = None) -> bool:
         """Check if table exists"""
         if schema_name:
-            full_name = f"{schema_name}.{table_name}" if schema_name != 'public' else table_name
-            return full_name in self.schema.tables
-
-        # Check without schema
-        for info in self.schema.tables.values():
-            if info['name'] == table_name:
-                return True
-        return False
+            return table_name in self.tables.get(schema_name, [])
+        return table_name in self.table_full_names
 
     def get_full_table_name(self, table_name: str, schema_name: Optional[str] = None) -> str:
         """Get fully qualified table name"""
         if schema_name:
-            return f"{schema_name}.{table_name}" if schema_name != 'public' else table_name
+            return f"{schema_name}.{table_name}"
+        return self.table_full_names.get(table_name, table_name)
 
-        # Find schema for this table
-        for info in self.schema.tables.values():
-            if info['name'] == table_name:
-                schema = info['schema']
-                return f"{schema}.{table_name}" if schema != 'public' else table_name
-
-        return table_name
-
-    # -------------------------
-    # COLUMN INFORMATION METHODS
-    # -------------------------
+    def get_table_info(self, table_name: str, schema_name: Optional[str] = None) -> Dict:
+        """Get full table information"""
+        full_name = self.get_full_table_name(table_name, schema_name)
+        schema = schema_name or self.table_schema.get(table_name, 'unknown')
+        return {
+            'name': table_name,
+            'schema': schema,
+            'full_name': full_name,
+            'category': self._get_category(schema),
+            'columns': self.get_columns(table_name, schema_name),
+            'primary_keys': self.get_primary_keys(table_name, schema_name),
+            'foreign_keys': self.get_foreign_keys(table_name, schema_name),
+            'has_composite_key': len(self.get_primary_keys(table_name, schema_name)) > 1
+        }
 
     def get_columns(self, table_name: str, schema_name: Optional[str] = None) -> List[Dict]:
-        """Get columns for a table - uses pre-cached data"""
+        """Get column details for a table"""
         if schema_name:
-            table_key = f"{schema_name}.{table_name}"
-            if table_key in self.schema.columns_by_table:
-                return [col.copy() for col in self.schema.columns_by_table[table_key]]
-
-        # Fallback to linear search
-        columns = []
-        for col in self.schema.columns:
-            if col['table_name'] == table_name:
-                if schema_name is None or col['schema_name'] == schema_name:
-                    columns.append(col.copy())
-        return columns
+            full_name = f"{schema_name}.{table_name}"
+            if full_name in self.columns:
+                return self.columns[full_name].copy()
+        full_name = self.table_full_names.get(table_name)
+        if full_name and full_name in self.columns:
+            return self.columns[full_name].copy()
+        return []
 
     def get_column_names(self, table_name: str, schema_name: Optional[str] = None) -> List[str]:
         """Get column names for a table"""
         columns = self.get_columns(table_name, schema_name)
         return [col['column_name'] for col in columns]
 
-    def column_exists(self, table_name: str, column_name: str,
-                      schema_name: Optional[str] = None) -> bool:
+    def column_exists(self, table_name: str, column_name: str, schema_name: Optional[str] = None) -> bool:
         """Check if column exists in table"""
         for col in self.get_columns(table_name, schema_name):
             if col['column_name'] == column_name:
@@ -364,70 +419,33 @@ class CSVDBInfo:
 
     def get_primary_keys(self, table_name: str, schema_name: Optional[str] = None) -> List[str]:
         """Get primary key columns for a table"""
-        pk_columns = []
-
-        for col in self.get_columns(table_name, schema_name):
-            if col.get('is_primary_key', False):
-                pk_columns.append(col['column_name'])
-
-        return pk_columns
-
-    def get_data_type(self, table_name: str, column_name: str,
-                      schema_name: Optional[str] = None) -> Optional[str]:
-        """Get data type for a column"""
-        for col in self.get_columns(table_name, schema_name):
-            if col['column_name'] == column_name:
-                return col.get('data_type', 'UNKNOWN')
-        return None
-
-    # -------------------------
-    # FOREIGN KEY METHODS
-    # -------------------------
+        full_name = self.get_full_table_name(table_name, schema_name)
+        return self.primary_keys.get(full_name, [])
 
     def get_foreign_keys(self, table_name: str, schema_name: Optional[str] = None) -> List[Dict]:
         """Get foreign keys for a table"""
-        fks = []
-
-        for col in self.get_columns(table_name, schema_name):
-            if col.get('is_foreign_key', False) and 'references_table' in col:
-                fks.append({
-                    'column': col['column_name'],
-                    'references_table': col['references_table'],
-                    'references_column': col['references_column'],
-                    'references_schema': col.get('references_schema', col['schema_name'])
-                })
-
-        return fks
+        full_name = self.get_full_table_name(table_name, schema_name)
+        return self.foreign_keys.get(full_name, [])
 
     def get_referenced_by(self, table_name: str, schema_name: Optional[str] = None) -> List[Dict]:
         """Get tables that reference this table"""
         refs = []
-
-        for col in self.schema.columns:
-            if (col.get('references_table') == table_name and
-                    col.get('is_foreign_key', False)):
-                if schema_name is None or col.get('references_schema') == schema_name:
+        for rel in self.relationships:
+            if rel['to_table'] == table_name:
+                if schema_name is None or rel['to_schema'] == schema_name:
                     refs.append({
-                        'from_table': col['table_name'],
-                        'from_schema': col['schema_name'],
-                        'from_column': col['column_name'],
-                        'references_column': col['references_column']
+                        'from_table': rel['from_table'],
+                        'from_schema': rel['from_schema'],
+                        'from_column': rel['from_column'],
+                        'references_column': rel['to_column']
                     })
-
         return refs
 
-    def find_relationship(self, table1: str, table2: str,
-                          schema1: Optional[str] = None,
-                          schema2: Optional[str] = None) -> Optional[Dict]:
-        """
-        Find relationship between two tables in either direction
-        Uses pre-cached relationships for faster lookup
-        """
-        # Check direct relationships (A -> B)
-        for rel in self.schema.relationships:
+    def find_relationship(self, table1: str, table2: str, schema1: Optional[str] = None, schema2: Optional[str] = None) -> Optional[Dict]:
+        """Find relationship between two tables"""
+        for rel in self.relationships:
             if (rel['from_table'] == table1 and rel['to_table'] == table2):
-                if (schema1 is None or rel['from_schema'] == schema1) and \
-                        (schema2 is None or rel['to_schema'] == schema2):
+                if (schema1 is None or rel['from_schema'] == schema1) and (schema2 is None or rel['to_schema'] == schema2):
                     return {
                         'type': 'forward',
                         'from_table': table1,
@@ -437,11 +455,8 @@ class CSVDBInfo:
                         'to_schema': rel['to_schema'],
                         'to_column': rel['to_column']
                     }
-
-            # Check reverse (B -> A)
             if (rel['from_table'] == table2 and rel['to_table'] == table1):
-                if (schema2 is None or rel['from_schema'] == schema2) and \
-                        (schema1 is None or rel['to_schema'] == schema1):
+                if (schema2 is None or rel['from_schema'] == schema2) and (schema1 is None or rel['to_schema'] == schema1):
                     return {
                         'type': 'reverse',
                         'from_table': table1,
@@ -451,708 +466,156 @@ class CSVDBInfo:
                         'to_schema': schema2 or rel['from_schema'],
                         'to_column': rel['from_column']
                     }
-
         return None
 
     def get_direct_relationships(self, table_name: str, schema_name: Optional[str] = None) -> List[Dict]:
         """Get all tables directly related to this table"""
         related = []
-
-        # Outgoing relationships
-        for rel in self.schema.relationships:
+        for rel in self.relationships:
             if rel['from_table'] == table_name:
                 if schema_name is None or rel['from_schema'] == schema_name:
                     related.append({
                         'table': rel['to_table'],
                         'schema': rel['to_schema'],
                         'type': 'parent',
-                        'via': {
-                            'from_column': rel['from_column'],
-                            'to_column': rel['to_column']
-                        }
+                        'via': {'from_column': rel['from_column'], 'to_column': rel['to_column']}
                     })
-
-        # Incoming relationships
-        for rel in self.schema.relationships:
             if rel['to_table'] == table_name:
                 if schema_name is None or rel['to_schema'] == schema_name:
                     related.append({
                         'table': rel['from_table'],
                         'schema': rel['from_schema'],
                         'type': 'child',
-                        'via': {
-                            'from_column': rel['from_column'],
-                            'to_column': rel['to_column']
-                        }
+                        'via': {'from_column': rel['from_column'], 'to_column': rel['to_column']}
                     })
-
         return related
 
     def get_all_relationships(self) -> List[Dict]:
         """Get all relationships"""
-        return self.schema.relationships.copy()
+        return self.relationships.copy()
 
-    # -------------------------
-    # CATEGORY METHODS
-    # -------------------------
+    def _get_category(self, schema: str) -> str:
+        """Get business category for a schema"""
+        return self.category_map.get(schema, "Other")
 
     def get_categories(self) -> List[str]:
         """Get all business categories"""
         return sorted(set(self.category_map.values()))
 
-    def get_tables_by_category(self, category: str) -> List[Dict]:
-        """Get all tables in a specific business category"""
-        tables = []
-        for table_info in self.schema.tables.values():
-            if table_info.get('category') == category:
-                tables.append(table_info.copy())
-        return tables
-
-    def get_schemas_by_category(self, category: str) -> List[str]:
-        """Get all schemas in a specific business category"""
-        schemas = set()
-        for table_info in self.schema.tables.values():
-            if table_info.get('category') == category:
-                schemas.add(table_info['schema'])
-        return sorted(schemas)
-
-    # -------------------------
-    # SEARCH METHODS
-    # -------------------------
-
     def search_tables(self, pattern: str) -> List[Dict]:
-        """Fast fuzzy search for tables matching pattern"""
+        """Search for tables matching pattern"""
         pattern = pattern.lower()
         results = []
-
-        for info in self.schema.tables.values():
-            if pattern in info['name'].lower() or pattern in info['schema'].lower():
-                results.append(info.copy())
-
+        for schema, tables in self.tables.items():
+            for table in tables:
+                if pattern in table.lower() or pattern in schema.lower():
+                    results.append({
+                        'name': table,
+                        'schema': schema,
+                        'full_name': f"{schema}.{table}",
+                        'category': self._get_category(schema)
+                    })
         return results
 
     def search_columns(self, pattern: str) -> List[Dict]:
         """Search for columns matching pattern"""
         pattern = pattern.lower()
         results = []
-
-        for col in self.schema.columns:
-            if pattern in col['column_name'].lower():
-                results.append({
-                    'table': col['table_name'],
-                    'schema': col['schema_name'],
-                    'column': col['column_name'],
-                    'data_type': col['data_type']
-                })
-
+        for full_name, columns in self.columns.items():
+            if '.' in full_name:
+                schema, table = full_name.split('.', 1)
+            else:
+                schema, table = 'unknown', full_name
+            for col in columns:
+                if pattern in col['column_name'].lower():
+                    results.append({
+                        'table': table,
+                        'schema': schema,
+                        'column': col['column_name'],
+                        'data_type': col.get('data_type', 'UNKNOWN')
+                    })
         return results
-
-    # -------------------------
-    # UTILITY METHODS
-    # -------------------------
-
-    def get_table_summary(self) -> pd.DataFrame:
-        """Get summary of all tables"""
-        summary = []
-
-        for full_name, info in self.schema.tables.items():
-            cols = self.get_columns(info['name'], info['schema'])
-            pk_count = sum(1 for c in cols if c.get('is_primary_key', False))
-            fk_count = sum(1 for c in cols if c.get('is_foreign_key', False))
-            rel_count = len(self.get_direct_relationships(info['name'], info['schema']))
-
-            summary.append({
-                'table_name': info['name'],
-                'schema': info['schema'],
-                'category': info.get('category', 'Other'),
-                'full_name': full_name,
-                'columns': len(cols),
-                'primary_keys': pk_count,
-                'foreign_keys': fk_count,
-                'relationships': rel_count
-            })
-
-        return pd.DataFrame(summary)
 
     def get_stats(self) -> Dict:
         """Get statistics about the database"""
+        total_columns = sum(len(cols) for cols in self.columns.values())
         return {
-            'total_tables': len(self.schema.tables),
-            'total_columns': len(self.schema.columns),
-            'total_relationships': len(self.schema.relationships),
+            'total_tables': len(self.table_full_names),
+            'total_columns': total_columns,
+            'total_relationships': len(self.relationships),
             'schemas': len(self.schemas),
-            'categories': len(self.get_categories()),
-            'tables_by_schema': {s: len(t) for s, t in self.schema.tables_by_schema.items()},
-            'tables_by_category': self._get_tables_by_category_count()
+            'target_schemas': list(self.target_schemas),
+            'tables_by_schema': {s: len(t) for s, t in self.tables.items()},
+            'composite_key_tables': len(self.composite_keys)
         }
 
     def get_schema_index(self) -> Dict[str, List[str]]:
-        """
-        Returns a lookup for the frontend to know which tables belong where
-        Creates a map: {"gmhk": ["table1", "table2"], "pmm": ["table3"]}
-
-        Returns:
-            Dictionary with schema names as keys and lists of table names as values
-        """
-        schema_index = {}
-
-        # Use the pre-cached tables_by_schema
-        for schema, tables in self.schema.tables_by_schema.items():
-            schema_index[schema] = [table['name'] for table in tables]
-
-        return schema_index
-
-    def get_schema_index_with_details(self) -> Dict[str, List[Dict]]:
-        """
-        Returns a detailed lookup with full table information
-        Creates a map: {"gmhk": [{"name": "table1", "category": "..."}, ...]}
-
-        Returns:
-            Dictionary with schema names as keys and lists of table info dicts as values
-        """
-        schema_index = {}
-
-        # Use the pre-cached tables_by_schema with full details
-        for schema, tables in self.schema.tables_by_schema.items():
-            schema_index[schema] = [table.copy() for table in tables]
-
-        return schema_index
-
-    def get_category_index(self) -> Dict[str, List[str]]:
-        """
-        Returns a lookup by category
-        Creates a map: {"Personnel Management": ["pmm.employees", "pmm.departments"], ...}
-
-        Returns:
-            Dictionary with category names as keys and lists of qualified table names as values
-        """
-        category_index = {}
-
-        for full_name, table_info in self.schema.tables.items():
-            category = table_info.get('category', 'Other')
-            if category not in category_index:
-                category_index[category] = []
-            category_index[category].append(table_info['full_name'])
-
-        return category_index
-
-    def get_table_count_by_schema(self) -> Dict[str, int]:
-        """
-        Returns count of tables per schema for quick stats
-
-        Returns:
-            Dictionary with schema names as keys and table counts as values
-        """
-        return {schema: len(tables) for schema, tables in self.schema.tables_by_schema.items()}
-
-    def get_table_count_by_category(self) -> Dict[str, int]:
-        """
-        Returns count of tables per category for quick stats
-
-        Returns:
-            Dictionary with category names as keys and table counts as values
-        """
-        return self._get_tables_by_category_count()
-
-    def _get_tables_by_category_count(self) -> Dict[str, int]:
-        """Get count of tables per category"""
-        counts = {}
-        for table_info in self.schema.tables.values():
-            category = table_info.get('category', 'Other')
-            counts[category] = counts.get(category, 0) + 1
-        return counts
+        """Returns a lookup for frontend dropdown"""
+        return {schema: tables.copy() for schema, tables in self.tables.items()}
 
 
-# ========== QUERY VALIDATOR ==========
+# ========== HELPER FUNCTIONS ==========
+
+def get_test_db_info() -> CSVDBInfo:
+    """Get a test database info instance"""
+    return CSVDBInfo()
+
+
+def get_db_info_from_json(json_path: str) -> CSVDBInfo:
+    """Get database info from JSON file"""
+    return CSVDBInfo(json_path)
+
+
+class DBInfo(CSVDBInfo):
+    """Compatibility class for code that expects DBInfo"""
+    pass
+
 
 class QueryValidator:
-    """
-    Query Validator Module - Validates SQL queries against database schema
-    Identifies errors and provides feedback for correction
-    """
-
+    """Query Validator for API endpoints"""
     def __init__(self, db_info: CSVDBInfo):
-        """
-        Initialize validator with database schema
-
-        Args:
-            db_info: CSVDBInfo instance with parsed schema
-        """
         self.db_info = db_info
         self.errors = []
         self.warnings = []
 
-    def validate_query_generator(self, query_gen) -> bool:
-        """Validate a QueryGenerator instance"""
-        self.errors = []
-        self.warnings = []
-
-        # Get metadata - assuming QueryGenerator has get_metadata method
-        try:
-            metadata = query_gen.get_metadata()
-        except AttributeError:
-            # Try to get attributes directly
-            metadata = {
-                'table': getattr(query_gen, 'table', ''),
-                'schema': getattr(query_gen, 'schema', None),
-                'selected_columns': getattr(query_gen, 'selected_columns', []),
-                'conditions': getattr(query_gen, 'conditions', [])
-            }
-
-        # Check table existence
-        if not self.db_info.table_exists(metadata.get('table', ''), metadata.get('schema')):
-            self.errors.append(f"Table '{metadata.get('table', '')}' does not exist")
-            return False
-
-        # Check columns
-        selected_columns = metadata.get('selected_columns', [])
-        for col in selected_columns:
-            if col == '*':
-                continue
-
-            # Handle aliases and aggregates
-            col_name = self._extract_column_name(col)
-            if col_name and not self.db_info.column_exists(
-                    metadata.get('table', ''),
-                    col_name,
-                    metadata.get('schema')
-            ):
-                self.warnings.append(
-                    f"Column '{col_name}' may not exist in table '{metadata.get('table', '')}'"
-                )
-
-        # Check WHERE conditions
-        conditions = metadata.get('conditions', [])
-        for cond in conditions:
-            if isinstance(cond, (list, tuple)) and len(cond) > 0:
-                col_name = cond[0]
-                if not self.db_info.column_exists(
-                        metadata.get('table', ''),
-                        col_name,
-                        metadata.get('schema')
-                ):
-                    self.errors.append(f"WHERE column '{col_name}' does not exist")
-
-        return len(self.errors) == 0
-
-    def validate_join_builder(self, join_builder) -> bool:
-        """Validate a JoinBuilder instance"""
-        self.errors = []
-        self.warnings = []
-
-        # Get preview data
-        try:
-            preview = join_builder.preview()
-        except AttributeError:
-            # If preview not available, try to get join info directly
-            preview = self._extract_join_info(join_builder)
-
-        # Check if all tables exist
-        join_path = preview.get('join_path', [])
-        for item in join_path:
-            if item.get('type') == 'table':
-                table = item.get('table', '')
-                schema = item.get('schema')
-
-                if not self.db_info.table_exists(table, schema):
-                    self.errors.append(f"Table '{table}' does not exist")
-
-            elif item.get('type') == 'join':
-                # Check source table
-                from_table = item.get('from_table', '')
-                from_schema = item.get('from_schema')
-
-                if not self.db_info.table_exists(from_table, from_schema):
-                    self.errors.append(f"Join source table '{from_table}' does not exist")
-
-                # Check target table
-                to_table = item.get('to_table', '')
-                to_schema = item.get('to_schema')
-
-                if not self.db_info.table_exists(to_table, to_schema):
-                    self.errors.append(f"Join target table '{to_table}' does not exist")
-
-                # Check relationship
-                if not self._validate_relationship(item):
-                    self.warnings.append(
-                        f"Relationship between {from_table}.{item.get('from_column', '')} "
-                        f"and {to_table}.{item.get('to_column', '')} may not exist"
-                    )
-
-        # Check selected columns
-        selected_columns = preview.get('selected_columns', [])
-        table_aliases = preview.get('table_aliases', {})
-
-        for col_info in selected_columns:
-            if col_info.get('type') == 'aggregate':
-                # Skip aggregate validation for now
-                continue
-
-            table = col_info.get('table')
-            column = col_info.get('column')
-
-            if column == '*':
-                continue
-
-            # Find table info
-            table_info = self._find_table_info(table, table_aliases)
-            if not table_info:
-                self.errors.append(f"Table alias '{table}' not found")
-                continue
-
-            if not self.db_info.column_exists(
-                    table_info.get('table', ''),
-                    column,
-                    table_info.get('schema')
-            ):
-                self.errors.append(
-                    f"Column '{column}' does not exist in table '{table_info.get('table', '')}'"
-                )
-
-        return len(self.errors) == 0
-
-    def validate_cte_builder(self, cte_builder) -> bool:
-        """Validate a CTEBuilder instance"""
-        self.errors = []
-        self.warnings = []
-
-        try:
-            metadata = cte_builder.get_metadata()
-        except AttributeError:
-            # If get_metadata not available, try to extract info
-            metadata = {
-                'stage_names': getattr(cte_builder, 'stage_names', []),
-                'has_final_query': hasattr(cte_builder, 'final_query')
-            }
-
-        # Check for circular references (simplified)
-        stage_names = metadata.get('stage_names', [])
-
-        # Could add more validation here
-
-        return len(self.errors) == 0
-
     def validate_sql(self, sql: str) -> bool:
-        """
-        Validate raw SQL string
-
-        This is a simplified validation - in production would use a SQL parser
-        """
         self.errors = []
         self.warnings = []
-
-        # Check for basic SQL structure
         sql_upper = sql.upper().strip()
-
         if not sql_upper:
             self.errors.append("Empty SQL query")
             return False
-
         if 'SELECT' not in sql_upper:
             self.errors.append("Query must contain SELECT")
             return False
-
         if 'FROM' not in sql_upper:
             self.errors.append("Query must contain FROM")
             return False
-
-        # Extract table names (simplified)
-        tables = self._extract_table_names(sql)
-
-        for table in tables:
-            if not self.db_info.table_exists(table):
-                self.warnings.append(f"Table '{table}' may not exist")
-
         return len(self.errors) == 0
 
-    def _extract_column_name(self, col_str: str) -> str:
-        """Extract column name from SELECT expression"""
-        col_str = str(col_str)
-
-        # Remove alias
-        if ' AS ' in col_str.upper():
-            col_str = col_str.split(' AS ')[0]
-
-        # Remove aggregate functions
-        if '(' in col_str and ')' in col_str:
-            match = re.search(r'\(([^)]+)\)', col_str)
-            if match:
-                col_str = match.group(1)
-
-        # Remove table alias
-        if '.' in col_str:
-            col_str = col_str.split('.')[-1]
-
-        return col_str.strip()
-
-    def _validate_relationship(self, join_item: Dict) -> bool:
-        """Validate that a relationship exists"""
-        rel = self.db_info.find_relationship(
-            join_item.get('from_table', ''),
-            join_item.get('to_table', ''),
-            join_item.get('from_schema'),
-            join_item.get('to_schema')
-        )
-
-        if not rel:
-            return False
-
-        # Check if the columns match
-        return (rel.get('from_column') == join_item.get('from_column') and
-                rel.get('to_column') == join_item.get('to_column'))
-
-    def _find_table_info(self, alias: str, table_aliases: Dict) -> Optional[Dict]:
-        """Find table info by alias"""
-        return table_aliases.get(alias)
-
-    def _extract_table_names(self, sql: str) -> List[str]:
-        """Extract table names from SQL (simplified)"""
-        tables = []
-
-        # Find FROM clause
-        from_match = re.search(r'FROM\s+([^\s;]+)', sql, re.IGNORECASE)
-        if from_match:
-            table_name = from_match.group(1).strip()
-            tables.append(table_name)
-
-        # Find JOIN clauses
-        join_matches = re.findall(r'JOIN\s+([^\s]+)', sql, re.IGNORECASE)
-        tables.extend([j.strip() for j in join_matches])
-
-        # Remove schema prefixes and clean
-        cleaned_tables = []
-        for t in tables:
-            # Remove any trailing punctuation
-            t = re.sub(r'[;,]', '', t)
-
-            # Extract just the table name if schema qualified
-            if '.' in t:
-                t = t.split('.')[-1]
-
-            # Remove quotes if present
-            t = t.strip('"`')
-
-            cleaned_tables.append(t)
-
-        return cleaned_tables
-
-    def _extract_join_info(self, join_builder) -> Dict:
-        """Extract join information from a JoinBuilder instance"""
-        # Default structure
-        info = {
-            'join_path': [],
-            'selected_columns': [],
-            'table_aliases': {}
-        }
-
-        # Try to get joins if available
-        if hasattr(join_builder, 'joins'):
-            for join in join_builder.joins:
-                info['join_path'].append({
-                    'type': 'join',
-                    'from_table': getattr(join, 'from_table', ''),
-                    'from_schema': getattr(join, 'from_schema', None),
-                    'from_column': getattr(join, 'from_column', ''),
-                    'to_table': getattr(join, 'to_table', ''),
-                    'to_schema': getattr(join, 'to_schema', None),
-                    'to_column': getattr(join, 'to_column', '')
-                })
-
-        # Try to get tables
-        if hasattr(join_builder, 'tables'):
-            for table in join_builder.tables:
-                info['join_path'].append({
-                    'type': 'table',
-                    'table': getattr(table, 'name', str(table)),
-                    'schema': getattr(table, 'schema', None)
-                })
-
-        return info
-
     def get_errors(self) -> List[str]:
-        """Get validation errors"""
         return self.errors
 
     def get_warnings(self) -> List[str]:
-        """Get validation warnings"""
         return self.warnings
 
     def clear(self):
-        """Clear errors and warnings"""
         self.errors = []
         self.warnings = []
 
 
-# ========== WRAPPER FUNCTIONS FOR COMPATIBILITY ==========
-
-_validator_instance = None
-_default_db_info = None
-
-
-def _get_default_db_info(csv_file_path: str = None):
-    """Get or create a default CSVDBInfo instance"""
-    global _default_db_info
-    if _default_db_info is None:
-        if csv_file_path:
-            _default_db_info = CSVDBInfo(csv_file_path)
-        else:
-            # Try to find CSV file
-            import os
-            if os.path.exists("master_db_schema.csv"):
-                _default_db_info = CSVDBInfo("master_db_schema.csv")
-            elif os.path.exists("master_db_schema.csv"):
-                _default_db_info = CSVDBInfo("master_db_schema.csv")
-            else:
-                _default_db_info = CSVDBInfo()  # Use test data
-    return _default_db_info
-
-
-def _get_validator_instance(csv_file_path: str = None):
-    """Get or create the validator instance"""
-    global _validator_instance
-    if _validator_instance is None:
-        _validator_instance = QueryValidator(_get_default_db_info(csv_file_path))
-    return _validator_instance
-
-
-def validate(query_or_obj, csv_file_path: str = None):
-    """
-    Wrapper function to validate a query
-    Compatible with test.py
-
-    Args:
-        query_or_obj: SQL string, QueryGenerator, JoinBuilder, or CTEBuilder
-        csv_file_path: Optional path to CSV schema file
-
-    Returns:
-        bool: True if valid, False otherwise
-    """
-    validator = _get_validator_instance(csv_file_path)
-    validator.clear()
-
-    # Check the type and validate accordingly
-    if isinstance(query_or_obj, str):
-        return validator.validate_sql(query_or_obj)
-    elif hasattr(query_or_obj, '__class__'):
-        class_name = query_or_obj.__class__.__name__
-        if class_name in ['QueryGenerator', 'QueryGenerator']:
-            return validator.validate_query_generator(query_or_obj)
-        elif class_name in ['JoinBuilder', 'JoinBuilder']:
-            return validator.validate_join_builder(query_or_obj)
-        elif class_name in ['CTEBuilder', 'CTEBuilder']:
-            return validator.validate_cte_builder(query_or_obj)
-
-    # Default fallback
-    return False
-
-
-def validate_sql(sql: str, csv_file_path: str = None) -> bool:
-    """
-    Wrapper function to validate SQL string
-    """
-    return validate(sql, csv_file_path)
-
-
-def get_validation_errors():
-    """
-    Get validation errors from last validation
-    """
-    validator = _get_validator_instance()
-    return validator.get_errors()
-
-
-def get_validation_warnings():
-    """
-    Get validation warnings from last validation
-    """
-    validator = _get_validator_instance()
-    return validator.get_warnings()
-
-
-def reset_validator():
-    """
-    Reset the validator instance
-    """
-    global _validator_instance
-    _validator_instance = None
-    return True
-
-
-def set_csv_schema(csv_file_path: str):
-    """
-    Set the CSV schema file to use for validation
-
-    Args:
-        csv_file_path: Path to the CSV schema file
-    """
-    global _default_db_info, _validator_instance
-    _default_db_info = CSVDBInfo(csv_file_path)
-    _validator_instance = QueryValidator(_default_db_info)
-    return True
-
-# ========== COMPATIBILITY LAYER ==========
-# This provides backward compatibility for code that still imports DBInfo
-
-class DBInfo(CSVDBInfo):
-    """
-    Compatibility class for code that expects DBInfo
-    Inherits all functionality from CSVDBInfo
-    """
-    pass
-
-
-# Also export CSVDBInfo as DBInfo for direct imports
-# This allows both "from db_information import CSVDBInfo" and "from db_information import DBInfo" to work
-__all__ = ['CSVDBInfo', 'DBInfo', 'CSVSchema', 'QueryValidator']
-# ========== MAIN DEMO ==========
-
 if __name__ == "__main__":
-    # Demo usage
-    print("=" * 60)
-    print("CSV-BASED QUERY VALIDATOR")
-    print("=" * 60)
+    print("=" * 80)
+    print("DATABASE INFORMATION MODULE")
+    print("=" * 80)
+    import sys
+    json_path = None
+    if len(sys.argv) > 1:
+        json_path = sys.argv[1]
+    db_info = CSVDBInfo(json_path) if json_path else CSVDBInfo()
 
-    # Initialize with CSV file
-    validator = QueryValidator(_get_default_db_info())
-
-    print(f"\n✅ Validator initialized")
-    print(f"📊 Tables loaded: {len(validator.db_info.get_tables())}")
-    print(f"📁 Schemas found: {validator.db_info.get_schemas()}")
-    print(f"📂 Categories: {validator.db_info.get_categories()}")
-
-    # Test table existence
-    test_table = "gmhk_appointment"
-    exists = validator.db_info.table_exists(test_table)
-    print(f"\n📋 Table '{test_table}' exists: {exists}")
-
-    if exists:
-        columns = validator.db_info.get_columns(test_table)
-        print(f"   Columns: {[c['column_name'] for c in columns[:5]]}...")
-
-    # Test categories
-    print(f"\n📂 Categories: {validator.db_info.get_categories()}")
-    for category in validator.db_info.get_categories()[:2]:  # Show first 2 categories
-        tables = validator.db_info.get_tables_by_category(category)
-        print(f"   {category}: {len(tables)} tables")
-
-    # Test SQL validation
-    print("\n" + "=" * 60)
-    print("SQL VALIDATION TEST")
-    print("=" * 60)
-
-    valid_sql = "SELECT * FROM gmhk_appointment WHERE emp_no = 100"
-    invalid_sql = "SELECT * FROM non_existent_table"
-
-    print(f"\nValid SQL: {valid_sql}")
-    is_valid = validator.validate_sql(valid_sql)
-    print(f"Result: {'✅ VALID' if is_valid else '❌ INVALID'}")
-    if validator.get_warnings():
-        print(f"Warnings: {validator.get_warnings()}")
-
-    validator.clear()
-
-    print(f"\nInvalid SQL: {invalid_sql}")
-    is_valid = validator.validate_sql(invalid_sql)
-    print(f"Result: {'✅ VALID' if is_valid else '❌ INVALID'}")
-    if validator.get_errors():
-        print(f"Errors: {validator.get_errors()}")
+    print(f"\nSchemas: {db_info.get_schemas()}")
+    print(f"Total tables: {len(db_info.get_tables())}")
+    print("\nTables per schema:")
+    for schema, tables in db_info.get_schema_index().items():
+        print(f"  {schema}: {len(tables)} tables")

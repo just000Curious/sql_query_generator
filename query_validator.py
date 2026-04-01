@@ -123,15 +123,23 @@ class QueryValidator:
         self.errors = []
         self.warnings = []
 
-        metadata = cte_builder.get_metadata()
+        # Basic validation
+        if not cte_builder:
+            self.errors.append("CTE builder is None")
+            return False
 
-        # Check for circular references (simplified)
-        stage_names = set(metadata['stage_names'])
+        try:
+            metadata = cte_builder.get_metadata()
 
-        # Check final query
-        if metadata['has_final_query']:
-            # Would need to parse and validate
-            pass
+            # Check for circular references (simplified)
+            stage_names = set(metadata.get('stage_names', []))
+
+            # Check final query
+            if not metadata.get('has_final_query', False):
+                self.warnings.append("No final query set in CTE builder")
+
+        except Exception as e:
+            self.errors.append(f"Error accessing CTE builder metadata: {str(e)}")
 
         return len(self.errors) == 0
 

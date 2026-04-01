@@ -5,14 +5,13 @@ import pandas as pd
 from db_information import DBInfo
 from pypika_query_engine import QueryGenerator
 from temporary_table import TemporaryTable
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pypika_query_engine import QueryGenerator
 
 
 class JoinBuilder:
-    """
-    Join Builder Module - Constructs JOIN clauses using relationship data
-    from DBInfo. Automatically detects relationships and builds join paths.
-    """
-
     def __init__(self, db_info: DBInfo):
         """
         Initialize JoinBuilder with database schema information
@@ -114,6 +113,47 @@ class JoinBuilder:
             'to_alias': to_alias,
             'to_column': to_column,
             'join_type': join_type
+        })
+
+        return self
+
+    def add_join_compound(self, from_table: str, to_table: str,
+                          conditions: List[Dict[str, str]],
+                          from_schema: Optional[str] = None,
+                          to_schema: Optional[str] = None,
+                          from_alias: Optional[str] = None,
+                          to_alias: Optional[str] = None,
+                          join_type: str = 'INNER JOIN') -> 'JoinBuilder':
+        """
+        Add a join with multiple conditions (compound join)
+
+        Args:
+            conditions: List of dicts with keys 'from_column' and 'to_column'
+        """
+        if not from_alias:
+            from_alias = from_table
+        if not to_alias:
+            to_alias = to_table
+
+        # Build compound condition
+        condition_parts = []
+        for cond in conditions:
+            condition_parts.append(f"{from_alias}.{cond['from_column']} = {to_alias}.{cond['to_column']}")
+
+        compound_condition = " AND ".join(condition_parts)
+
+        self.join_path.append({
+            'type': 'join',
+            'from_table': from_table,
+            'from_schema': from_schema,
+            'from_alias': from_alias,
+            'to_table': to_table,
+            'to_schema': to_schema,
+            'to_alias': to_alias,
+            'condition': compound_condition,
+            'join_type': join_type,
+            'is_compound': True,
+            'compound_conditions': conditions
         })
 
         return self
@@ -355,7 +395,7 @@ class JoinBuilder:
     # CTE ARCHITECTURE
     # -------------------------
 
-    def with_cte(self, name: str, query_generator: QueryGenerator) -> 'JoinBuilder':
+    def with_cte(self, name: str, query_generator: 'QueryGenerator') -> 'JoinBuilder':
         """Add a CTE to the query"""
         self.ctes.append({
             'name': name,
@@ -392,12 +432,6 @@ class JoinBuilder:
         """Build the SELECT clause"""
         if not self.selected_columns:
             return "SELECT *"
-
-        select_parts = ["SELECT"]
-
-        if self._has_aggregates():
-            # Will be handled by actual query builder
-            pass
 
         columns = []
         for col_info in self.selected_columns:
@@ -451,14 +485,25 @@ class JoinBuilder:
         for item in self.join_path[1:]:
             if item['type'] == 'join':
                 join_type = item.get('join_type', 'INNER JOIN')
-                from_alias = item.get('from_alias', item['from_table'])
-                to_ref = self._build_table_reference({
-                    'table': item['to_table'],
-                    'schema': item.get('to_schema'),
-                    'alias': item.get('to_alias', item['to_table'])
-                })
 
-                join_condition = f"{from_alias}.{item['from_column']} = {item.get('to_alias', item['to_table'])}.{item['to_column']}"
+                # Handle compound joins vs simple joins
+                if item.get('is_compound'):
+                    from_alias = item.get('from_alias', item['from_table'])
+                    to_ref = self._build_table_reference({
+                        'table': item['to_table'],
+                        'schema': item.get('to_schema'),
+                        'alias': item.get('to_alias', item['to_table'])
+                    })
+                    join_condition = item['condition']
+                else:
+                    from_alias = item.get('from_alias', item['from_table'])
+                    to_ref = self._build_table_reference({
+                        'table': item['to_table'],
+                        'schema': item.get('to_schema'),
+                        'alias': item.get('to_alias', item['to_table'])
+                    })
+                    join_condition = f"{from_alias}.{item['from_column']} = {item.get('to_alias', item['to_table'])}.{item['to_column']}"
+
                 from_clause += f"\n{join_type} {to_ref} ON {join_condition}"
 
         return from_clause

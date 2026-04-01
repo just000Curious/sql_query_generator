@@ -1,4 +1,5 @@
 from typing import Dict, List, Optional, Union, Any
+from datetime import date, datetime  # Add this import
 
 from db_information import DBInfo
 from pypika_query_engine import QueryGenerator
@@ -7,7 +8,10 @@ from query_assembler import QueryAssembler
 from cte_builder import CTEBuilder
 from query_validator import QueryValidator
 from temporary_table import TemporaryTable, TemporaryTableManager
+from union_builder import UnionBuilder, union_all, union, intersect, except_
 
+from filter_templates import DateRangeBuilder, FilterTemplate
+from union_builder import UnionBuilder
 
 class QueryEngine:
     """
@@ -15,15 +19,18 @@ class QueryEngine:
     Follows the project architecture flowchart
     """
 
-    def __init__(self, schema_file_path: str):
+    def __init__(self, schema_file_path: str = None):  # Make schema_file_path optional
         """
         Initialize query engine with database schema
 
         Args:
-            schema_file_path: Path to SQL schema file
+            schema_file_path: Path to SQL schema file (optional)
         """
         # Step 1: DBInfo Module - Schema Intelligence Layer
-        self.db_info = DBInfo(schema_file_path)
+        if schema_file_path:
+            self.db_info = DBInfo(schema_file_path)
+        else:
+            self.db_info = DBInfo()  # Use test data
 
         # Initialize other components
         self.query_generator = None
@@ -243,3 +250,68 @@ class QueryEngine:
         self.temp_table_manager = TemporaryTableManager()
         self.validator.clear()
         self.current_stage = 0
+
+    def combine_queries(self, queries: List[Union[QueryGenerator, str]],
+                        operation: str = "UNION ALL") -> UnionBuilder:
+        """
+        Combine multiple queries using set operations
+
+        Args:
+            queries: List of QueryGenerator objects or SQL strings
+            operation: UNION, UNION ALL, INTERSECT, EXCEPT
+
+        Returns:
+            UnionBuilder instance
+        """
+        builder = UnionBuilder()
+
+        for i, q in enumerate(queries):
+            op = operation if i < len(queries) - 1 else None
+            if op:
+                builder.add_query(q, op)
+            else:
+                builder.add_query(q)
+
+        return builder
+
+    def create_union_all(self, queries: List[Union[QueryGenerator, str]]) -> str:
+        """Create UNION ALL of multiple queries"""
+        return union_all(*queries).build()
+
+    def create_union(self, queries: List[Union[QueryGenerator, str]]) -> str:
+        """Create UNION of multiple queries"""
+        return union(*queries).build()
+
+    def create_intersect(self, queries: List[Union[QueryGenerator, str]]) -> str:
+        """Create INTERSECT of multiple queries"""
+        return intersect(*queries).build()
+
+    def apply_date_range(self, query: QueryGenerator, column: str,
+                         start: Union[str, date, datetime],
+                         end: Union[str, date, datetime]) -> QueryGenerator:
+        """
+        Apply a date range filter to a query
+        """
+        return DateRangeBuilder().add_range(column, start, end).apply_to(query)
+
+    def create_filter_template(self) -> FilterTemplate:
+        """Get filter template helper"""
+        return FilterTemplate()
+
+    def create_date_range_builder(self) -> DateRangeBuilder:
+        """Create a new date range builder"""
+        return DateRangeBuilder()
+
+    def union_queries(self, queries: List[Union[QueryGenerator, str]],
+                      all_: bool = True) -> str:
+        """Create UNION or UNION ALL of multiple queries"""
+        builder = UnionBuilder()
+        operation = "UNION ALL" if all_ else "UNION"
+
+        for i, q in enumerate(queries):
+            if i < len(queries) - 1:
+                builder.add_query(q, operation)
+            else:
+                builder.add_query(q)
+
+        return builder.build()

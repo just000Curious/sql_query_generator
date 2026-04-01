@@ -1,10 +1,10 @@
 from typing import Dict, List, Optional, Union, Any
 from pypika import Query, Table
+# Add this import:
+from collections import deque  # If used, otherwise remove
 
 from pypika_query_engine import QueryGenerator
 from query_assembler import QueryAssembler
-
-
 class CTEBuilder:
     """
     CTE Builder Module - Constructs multi-stage SQL queries using Common Table Expressions
