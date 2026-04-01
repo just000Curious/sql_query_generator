@@ -1,0 +1,209 @@
+================================================================================
+SQL QUERY GENERATOR - GENERATED QUERIES
+Generated: 2026-03-31 23:09:49
+Success Rate: 17/17 (100.0%)
+================================================================================
+
+
+--- QUERY 1: All Employees [✅ SUCCESS] ---
+-- Rows returned: 3
+SELECT * FROM pmm_employee
+
+----------------------------------------
+
+
+--- QUERY 2: Employee Basic Info [✅ SUCCESS] ---
+-- Rows returned: 3
+SELECT emp_no as employee_id, emp_name as full_name, salary FROM pmm_employee
+
+----------------------------------------
+
+
+--- QUERY 3: IT Department Employees [✅ SUCCESS] ---
+-- Rows returned: 3
+SELECT * FROM pmm_employee WHERE emp_dept_cd = 'IT'
+
+----------------------------------------
+
+
+--- QUERY 4: Employee Count [✅ SUCCESS] ---
+-- Rows returned: 7
+SELECT COUNT(*) as total_employees FROM pmm_employee
+
+----------------------------------------
+
+
+--- QUERY 5: Complaints in 2024 [✅ SUCCESS] ---
+-- Rows returned: 7
+SELECT * FROM gmtk_coms_hdr WHERE strftime('%Y', reg_date) = '2024'
+
+----------------------------------------
+
+
+--- QUERY 6: Complaints in Jan 2024 [✅ SUCCESS] ---
+-- Rows returned: 4
+SELECT * FROM gmtk_coms_hdr WHERE reg_date BETWEEN '2024-01-01' AND '2024-01-31'
+
+----------------------------------------
+
+
+--- QUERY 7: Employees with Departments [✅ SUCCESS] ---
+-- Rows returned: 7
+
+            SELECT e.emp_no, e.emp_name, e.salary, d.emp_dept_desc
+            FROM pmm_employee e
+            INNER JOIN pmm_department d ON e.emp_dept_cd = d.emp_dept_cd
+        
+
+----------------------------------------
+
+
+--- QUERY 8: Employees and their Complaints [✅ SUCCESS] ---
+-- Rows returned: 7
+
+            SELECT e.emp_no, e.emp_name, c.complaint_no, c.status
+            FROM pmm_employee e
+            LEFT JOIN gmtk_coms_hdr c ON e.emp_no = c.emp_no
+            LIMIT 10
+        
+
+----------------------------------------
+
+
+--- QUERY 9: Employee Complaint Forward History [✅ SUCCESS] ---
+-- Rows returned: 7
+
+            SELECT e.emp_no, e.emp_name, c.complaint_no, c.status, f.forward_to
+            FROM pmm_employee e
+            LEFT JOIN gmtk_coms_hdr c ON e.emp_no = c.emp_no
+            LEFT JOIN gmtk_fwd_dtl f ON c.complaint_no = f.complaint_no
+            LIMIT 10
+        
+
+----------------------------------------
+
+
+--- QUERY 10: Complaints by Status [✅ SUCCESS] ---
+-- Rows returned: 3
+SELECT status, COUNT(*) as complaint_count FROM gmtk_coms_hdr GROUP BY status
+
+----------------------------------------
+
+
+--- QUERY 11: Average Salary by Department [✅ SUCCESS] ---
+-- Rows returned: 4
+
+            SELECT e.emp_dept_cd, d.emp_dept_desc, AVG(e.salary) as avg_salary
+            FROM pmm_employee e
+            LEFT JOIN pmm_department d ON e.emp_dept_cd = d.emp_dept_cd
+            GROUP BY e.emp_dept_cd, d.emp_dept_desc
+        
+
+----------------------------------------
+
+
+--- QUERY 12: Employees with Department Average [✅ SUCCESS] ---
+-- Rows returned: 5
+
+            WITH dept_stats AS (
+                SELECT emp_dept_cd, AVG(salary) as dept_avg_salary
+                FROM pmm_employee
+                GROUP BY emp_dept_cd
+            )
+            SELECT e.emp_no, e.emp_name, e.salary, d.dept_avg_salary
+            FROM pmm_employee e
+            LEFT JOIN dept_stats d ON e.emp_dept_cd = d.emp_dept_cd
+            LIMIT 5
+        
+
+----------------------------------------
+
+
+--- QUERY 13: Salary Bands with CASE [✅ SUCCESS] ---
+-- Rows returned: 5
+
+            SELECT emp_no, emp_name, salary,
+                CASE 
+                    WHEN salary >= 70000 THEN 'High'
+                    WHEN salary >= 50000 THEN 'Medium'
+                    ELSE 'Low'
+                END as salary_band
+            FROM pmm_employee
+            LIMIT 5
+        
+
+----------------------------------------
+
+
+--- QUERY 14: Forward Details with COALESCE [✅ SUCCESS] ---
+-- Rows returned: 0
+
+            SELECT complaint_no, COALESCE(auth_remarks, 'No Remarks') as remarks
+            FROM gmtk_fwd_dtl
+            LIMIT 5
+        
+
+----------------------------------------
+
+
+--- QUERY 15: Employee Performance Analysis [✅ SUCCESS] ---
+-- Rows returned: 7
+
+            WITH complaint_stats AS (
+                SELECT emp_no, COUNT(*) as total_complaints
+                FROM gmtk_coms_hdr
+                GROUP BY emp_no
+            )
+            SELECT e.emp_no, e.emp_name, e.salary, d.emp_dept_desc,
+                   COALESCE(c.total_complaints, 0) as complaint_count,
+                   CASE 
+                       WHEN COALESCE(c.total_complaints, 0) = 0 THEN 'Excellent'
+                       WHEN COALESCE(c.total_complaints, 0) <= 2 THEN 'Good'
+                       ELSE 'Needs Improvement'
+                   END as performance_rating
+            FROM pmm_employee e
+            LEFT JOIN pmm_department d ON e.emp_dept_cd = d.emp_dept_cd
+            LEFT JOIN complaint_stats c ON e.emp_no = c.emp_no
+            ORDER BY complaint_count ASC
+            LIMIT 10
+        
+
+----------------------------------------
+
+
+--- QUERY 16: Medical Case Follow-up Analysis [✅ SUCCESS] ---
+-- Rows returned: 4
+
+            SELECT c.case_reg_no, c.patient_name, e.emp_name as employee_name,
+                   c.case_reg_dt, ex.doctor_note_1 as latest_diagnosis,
+                   ex.nxt_rev_dt as next_follow_up,
+                   CASE 
+                       WHEN ex.nxt_rev_dt < date('now') THEN 'Overdue'
+                       WHEN ex.nxt_rev_dt BETWEEN date('now') AND date('now', '+7 days') THEN 'Upcoming'
+                       ELSE 'Scheduled'
+                   END as follow_up_status
+            FROM hmt_case_reg c
+            INNER JOIN hmt_cln_exam ex ON c.case_reg_no = ex.case_reg_no
+            LEFT JOIN pmm_employee e ON c.emp_no = e.emp_no
+            WHERE ex.visit_no = 1
+            LIMIT 10
+        
+
+----------------------------------------
+
+
+--- QUERY 17: Monthly Financial Summary [✅ SUCCESS] ---
+-- Rows returned: 2
+
+            SELECT strftime('%Y-%m', transaction_date) as month,
+                   COUNT(*) as transaction_count,
+                   SUM(amount) as total_amount,
+                   AVG(amount) as avg_amount,
+                   SUM(tax_amount) as total_tax
+            FROM ta_tax_transaction
+            GROUP BY strftime('%Y-%m', transaction_date)
+            ORDER BY month DESC
+        
+
+----------------------------------------
+

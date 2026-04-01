@@ -1,0 +1,2750 @@
+{
+  "GM": [
+    {
+      "table_name": "gmtk_fwd_dtl",
+      "full_name": "GM.gmtk_fwd_dtl",
+      "columns": [
+        "complaint_no",
+        "forward_from",
+        "forward_to",
+        "serial_no",
+        "auth_remarks",
+        "auth_remarks_file",
+        "auth_id",
+        "auth_time_stamp",
+        "hod_remarks",
+        "hod_remarks_file",
+        "hod_id",
+        "hod_time_stamp"
+      ],
+      "columns_details": [
+        {
+          "column_name": "complaint_no",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "forward_from",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "forward_to",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "serial_no",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "auth_remarks",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "auth_remarks_file",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "auth_id",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "auth_time_stamp",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "hod_remarks",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "hod_remarks_file",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "hod_id",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "hod_time_stamp",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        }
+      ],
+      "column_count": 12,
+      "primary_keys": [
+        "complaint_no",
+        "forward_to",
+        "serial_no"
+      ],
+      "foreign_keys": []
+    },
+    {
+      "table_name": "gmtk_fwd_hdr",
+      "full_name": "GM.gmtk_fwd_hdr",
+      "columns": [
+        "complaint_no",
+        "fwd_emp_no",
+        "currently_with",
+        "user_id",
+        "time_stamp"
+      ],
+      "columns_details": [
+        {
+          "column_name": "complaint_no",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "fwd_emp_no",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "currently_with",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "user_id",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "time_stamp",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        }
+      ],
+      "column_count": 5,
+      "primary_keys": [
+        "complaint_no",
+        "fwd_emp_no"
+      ],
+      "foreign_keys": []
+    },
+    {
+      "table_name": "gmtk_fwd_hod",
+      "full_name": "GM.gmtk_fwd_hod",
+      "columns": [
+        "complaint_no",
+        "forward_from",
+        "forward_to",
+        "serial_no",
+        "hod_remarks",
+        "hod_remarks_file",
+        "hod_id",
+        "hod_time_stamp",
+        "auth_remarks",
+        "auth_remarks_file",
+        "auth_id",
+        "auth_time_stamp"
+      ],
+      "columns_details": [
+        {
+          "column_name": "complaint_no",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "forward_from",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "forward_to",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "serial_no",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "hod_remarks",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "hod_remarks_file",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "hod_id",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "hod_time_stamp",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "auth_remarks",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "auth_remarks_file",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "auth_id",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "auth_time_stamp",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        }
+      ],
+      "column_count": 12,
+      "primary_keys": [
+        "complaint_no",
+        "forward_to",
+        "serial_no"
+      ],
+      "foreign_keys": []
+    },
+    {
+      "table_name": "gmtk_vis_txn",
+      "full_name": "GM.gmtk_vis_txn",
+      "columns": [
+        "sr_no",
+        "location",
+        "name",
+        "company",
+        "address",
+        "city",
+        "state",
+        "mob_no",
+        "photo_no",
+        "p_flag",
+        "duration",
+        "purpose",
+        "vis_emp",
+        "token",
+        "vis_time",
+        "user_id",
+        "timestamp",
+        "ret_time",
+        "ret_user_id",
+        "ret_timestamp",
+        "a_flag"
+      ],
+      "columns_details": [
+        {
+          "column_name": "sr_no",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "location",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "name",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "company",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "address",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "city",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "state",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "mob_no",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "photo_no",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "p_flag",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "duration",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "purpose",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "vis_emp",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "token",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "vis_time",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "user_id",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "timestamp",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "ret_time",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "ret_user_id",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "ret_timestamp",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "a_flag",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        }
+      ],
+      "column_count": 21,
+      "primary_keys": [
+        "sr_no"
+      ],
+      "foreign_keys": []
+    },
+    {
+      "table_name": "gmhk_coms_hdr",
+      "full_name": "GM.gmhk_coms_hdr",
+      "columns": [
+        "complaint_no",
+        "action_no",
+        "action_taken",
+        "action_taken_file",
+        "action_taken_id",
+        "time_stamp"
+      ],
+      "columns_details": [
+        {
+          "column_name": "complaint_no",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "action_no",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "action_taken",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "action_taken_file",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "action_taken_id",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "time_stamp",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        }
+      ],
+      "column_count": 6,
+      "primary_keys": [],
+      "foreign_keys": []
+    }
+  ],
+  "HM": [
+    {
+      "table_name": "hmp_sys",
+      "full_name": "HM.hmp_sys",
+      "columns": [
+        "hl_unit_cd",
+        "rate_per_km",
+        "case_acc1",
+        "case_acc2",
+        "case_periodic",
+        "case_sick",
+        "case_food",
+        "case_employment",
+        "case_promotion",
+        "reg_init_fee",
+        "reg_follow_fee"
+      ],
+      "columns_details": [
+        {
+          "column_name": "hl_unit_cd",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "rate_per_km",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "case_acc1",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "case_acc2",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "case_periodic",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "case_sick",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "case_food",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "case_employment",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "case_promotion",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "reg_init_fee",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "reg_follow_fee",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        }
+      ],
+      "column_count": 11,
+      "primary_keys": [
+        "hl_unit_cd",
+        "rate_per_km",
+        "case_acc1",
+        "case_acc2",
+        "case_periodic",
+        "case_sick",
+        "case_food",
+        "case_employment",
+        "case_promotion",
+        "reg_init_fee",
+        "reg_follow_fee"
+      ],
+      "foreign_keys": []
+    },
+    {
+      "table_name": "hmm_cont",
+      "full_name": "HM.hmm_cont",
+      "columns": [
+        "contractor_cd",
+        "contractor_name",
+        "cont_addr1",
+        "cont_addr2",
+        "cont_addr3",
+        "city",
+        "state",
+        "pincode"
+      ],
+      "columns_details": [
+        {
+          "column_name": "contractor_cd",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "contractor_name",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "cont_addr1",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "cont_addr2",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "cont_addr3",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "city",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "state",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "pincode",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        }
+      ],
+      "column_count": 8,
+      "primary_keys": [
+        "contractor_cd"
+      ],
+      "foreign_keys": []
+    },
+    {
+      "table_name": "hmm_drug",
+      "full_name": "HM.hmm_drug",
+      "columns": [
+        "drug_cd",
+        "drug_name",
+        "pl_no"
+      ],
+      "columns_details": [
+        {
+          "column_name": "drug_cd",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "drug_name",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "pl_no",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        }
+      ],
+      "column_count": 3,
+      "primary_keys": [
+        "drug_cd"
+      ],
+      "foreign_keys": []
+    },
+    {
+      "table_name": "hmt_xray",
+      "full_name": "HM.hmt_xray",
+      "columns": [
+        "lab_reg_no",
+        "test_type_cd",
+        "test_dt",
+        "lung_parenchyma",
+        "vasculature",
+        "aortic_cardiac",
+        "bony_cage",
+        "pleural_spaces",
+        "domes_diaphragm",
+        "conclusion",
+        "observation_1",
+        "observation_2",
+        "observation_3",
+        "observation_4"
+      ],
+      "columns_details": [
+        {
+          "column_name": "lab_reg_no",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "test_type_cd",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "test_dt",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "lung_parenchyma",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "vasculature",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "aortic_cardiac",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "bony_cage",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "pleural_spaces",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "domes_diaphragm",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "conclusion",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "observation_1",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "observation_2",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "observation_3",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "observation_4",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        }
+      ],
+      "column_count": 14,
+      "primary_keys": [
+        "lab_reg_no",
+        "test_type_cd"
+      ],
+      "foreign_keys": []
+    },
+    {
+      "table_name": "hmp_param",
+      "full_name": "HM.hmp_param",
+      "columns": [
+        "param_type",
+        "param_cd",
+        "param_value",
+        "param_desc",
+        "from_dt",
+        "to_dt",
+        "user_id",
+        "user_timestamp"
+      ],
+      "columns_details": [
+        {
+          "column_name": "param_type",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "param_cd",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "param_value",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "param_desc",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "from_dt",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "to_dt",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "user_id",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "user_timestamp",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        }
+      ],
+      "column_count": 8,
+      "primary_keys": [
+        "param_type",
+        "param_cd",
+        "from_dt"
+      ],
+      "foreign_keys": []
+    }
+  ],
+  "PM": [
+    {
+      "table_name": "pmm_ad",
+      "full_name": "PM.pmm_ad",
+      "columns": [
+        "ad_cd",
+        "ad_flg",
+        "ad_desc",
+        "ad_short_desc",
+        "allow_use_flag",
+        "tax_flag",
+        "rly_krcl_flg",
+        "section_id",
+        "tax_ben_cd",
+        "party_cd",
+        "max_amount",
+        "min_basic",
+        "max_basic",
+        "grp_eligible",
+        "ent_dept_code",
+        "ptax_flag"
+      ],
+      "columns_details": [
+        {
+          "column_name": "ad_cd",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "ad_flg",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "ad_desc",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "ad_short_desc",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "allow_use_flag",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "tax_flag",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "rly_krcl_flg",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "section_id",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "tax_ben_cd",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "party_cd",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "max_amount",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "min_basic",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "max_basic",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "grp_eligible",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "ent_dept_code",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "ptax_flag",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        }
+      ],
+      "column_count": 16,
+      "primary_keys": [
+        "ad_cd"
+      ],
+      "foreign_keys": []
+    },
+    {
+      "table_name": "pmhk_ad",
+      "full_name": "PM.pmhk_ad",
+      "columns": [
+        "ad_cd",
+        "ad_flg",
+        "ad_desc",
+        "ad_short_desc",
+        "allow_use_flag",
+        "tax_flag",
+        "rly_krcl_flg",
+        "section_id",
+        "tax_ben_cd",
+        "party_cd",
+        "max_amount",
+        "min_basic",
+        "max_basic",
+        "grp_eligible",
+        "ent_dept_code",
+        "ptax_flag",
+        "user_id",
+        "timestamp",
+        "user_ip"
+      ],
+      "columns_details": [
+        {
+          "column_name": "ad_cd",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "ad_flg",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "ad_desc",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "ad_short_desc",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "allow_use_flag",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "tax_flag",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "rly_krcl_flg",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "section_id",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "tax_ben_cd",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "party_cd",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "max_amount",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "min_basic",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "max_basic",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "grp_eligible",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "ent_dept_code",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "ptax_flag",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "user_id",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "timestamp",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "user_ip",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        }
+      ],
+      "column_count": 19,
+      "primary_keys": [
+        "ad_cd",
+        "timestamp"
+      ],
+      "foreign_keys": []
+    },
+    {
+      "table_name": "pmt_tfr",
+      "full_name": "PM.pmt_tfr",
+      "columns": [
+        "emp_no",
+        "tfr_order_no",
+        "tfr_order_dt",
+        "req_timestamp",
+        "tfr_type",
+        "reporting_dt",
+        "emp_report_to",
+        "stn_cde",
+        "emp_loc_cd",
+        "emp_dept_cd",
+        "emp_unit_cd",
+        "emp_rep_stn_cd",
+        "rep_loc_cd",
+        "admin_flg",
+        "safety_sen_flg",
+        "prev_rep_stn_cd",
+        "prev_rep_loc_cd",
+        "prev_stn_cde",
+        "prev_loc_cd",
+        "prev_dept_cd",
+        "prev_emp_unit_cd",
+        "prev_admin_flg",
+        "prev_saf_sen_flg",
+        "post_status",
+        "prev_post_status",
+        "emp_desig_cd",
+        "prev_desig_cd",
+        "cancel_flg",
+        "inp_emp_no",
+        "inp_timestamp",
+        "tfr_status_flg",
+        "promotion_let_no",
+        "pay_flag",
+        "can_timestamp",
+        "can_emp_no",
+        "relieving_dt",
+        "take_over_dt",
+        "tfr_days",
+        "prev_att_stn",
+        "prev_att_loc",
+        "app_emp_no",
+        "remarks",
+        "rlv_by_emp_no",
+        "tkovr_by_emp_no",
+        "tkovr_timestamp",
+        "issued_by",
+        "issue_timestamp",
+        "prev_emp_report_to",
+        "prom_flg"
+      ],
+      "columns_details": [
+        {
+          "column_name": "emp_no",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": true,
+          "is_nullable": true,
+          "references_table": "pmm_employee",
+          "references_column": "emp_no"
+        },
+        {
+          "column_name": "tfr_order_no",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "tfr_order_dt",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "req_timestamp",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "tfr_type",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "reporting_dt",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "emp_report_to",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": true,
+          "is_nullable": true,
+          "references_table": "pmm_designation",
+          "references_column": "emp_desig_cd"
+        },
+        {
+          "column_name": "stn_cde",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "emp_loc_cd",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": true,
+          "is_nullable": true,
+          "references_table": "pmm_location",
+          "references_column": "emp_loc_cd"
+        },
+        {
+          "column_name": "emp_dept_cd",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": true,
+          "is_nullable": true,
+          "references_table": "pmm_department",
+          "references_column": "emp_dept_cd"
+        },
+        {
+          "column_name": "emp_unit_cd",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": true,
+          "is_nullable": true,
+          "references_table": "pmm_unit",
+          "references_column": "emp_unit_cd"
+        },
+        {
+          "column_name": "emp_rep_stn_cd",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "rep_loc_cd",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": true,
+          "is_nullable": true,
+          "references_table": "pmm_location",
+          "references_column": "emp_loc_cd"
+        },
+        {
+          "column_name": "admin_flg",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "safety_sen_flg",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "prev_rep_stn_cd",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "prev_rep_loc_cd",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": true,
+          "is_nullable": true,
+          "references_table": "pmm_location",
+          "references_column": "emp_loc_cd"
+        },
+        {
+          "column_name": "prev_stn_cde",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "prev_loc_cd",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": true,
+          "is_nullable": true,
+          "references_table": "pmm_location",
+          "references_column": "emp_loc_cd"
+        },
+        {
+          "column_name": "prev_dept_cd",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": true,
+          "is_nullable": true,
+          "references_table": "pmm_department",
+          "references_column": "emp_dept_cd"
+        },
+        {
+          "column_name": "prev_emp_unit_cd",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": true,
+          "is_nullable": true,
+          "references_table": "pmm_unit",
+          "references_column": "emp_unit_cd"
+        },
+        {
+          "column_name": "prev_admin_flg",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "prev_saf_sen_flg",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "post_status",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "prev_post_status",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "emp_desig_cd",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": true,
+          "is_nullable": true,
+          "references_table": "pmm_designation",
+          "references_column": "emp_desig_cd"
+        },
+        {
+          "column_name": "prev_desig_cd",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": true,
+          "is_nullable": true,
+          "references_table": "pmm_designation",
+          "references_column": "emp_desig_cd"
+        },
+        {
+          "column_name": "cancel_flg",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "inp_emp_no",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": true,
+          "is_nullable": true,
+          "references_table": "pmm_employee",
+          "references_column": "emp_no"
+        },
+        {
+          "column_name": "inp_timestamp",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "tfr_status_flg",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "promotion_let_no",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "pay_flag",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "can_timestamp",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "can_emp_no",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": true,
+          "is_nullable": true,
+          "references_table": "pmm_employee",
+          "references_column": "emp_no"
+        },
+        {
+          "column_name": "relieving_dt",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "take_over_dt",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "tfr_days",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "prev_att_stn",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "prev_att_loc",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "app_emp_no",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": true,
+          "is_nullable": true,
+          "references_table": "pmm_employee",
+          "references_column": "emp_no"
+        },
+        {
+          "column_name": "remarks",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "rlv_by_emp_no",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": true,
+          "is_nullable": true,
+          "references_table": "pmm_employee",
+          "references_column": "emp_no"
+        },
+        {
+          "column_name": "tkovr_by_emp_no",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": true,
+          "is_nullable": true,
+          "references_table": "pmm_employee",
+          "references_column": "emp_no"
+        },
+        {
+          "column_name": "tkovr_timestamp",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "issued_by",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": true,
+          "is_nullable": true,
+          "references_table": "pmm_employee",
+          "references_column": "emp_no"
+        },
+        {
+          "column_name": "issue_timestamp",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "prev_emp_report_to",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "prom_flg",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        }
+      ],
+      "column_count": 49,
+      "primary_keys": [
+        "tfr_order_no"
+      ],
+      "foreign_keys": [
+        {
+          "column": "emp_no",
+          "references_table": "pmm_employee",
+          "references_column": "emp_no",
+          "references_schema": "PM"
+        },
+        {
+          "column": "emp_report_to",
+          "references_table": "pmm_designation",
+          "references_column": "emp_desig_cd",
+          "references_schema": "PM"
+        },
+        {
+          "column": "emp_loc_cd",
+          "references_table": "pmm_location",
+          "references_column": "emp_loc_cd",
+          "references_schema": "PM"
+        },
+        {
+          "column": "emp_dept_cd",
+          "references_table": "pmm_department",
+          "references_column": "emp_dept_cd",
+          "references_schema": "PM"
+        },
+        {
+          "column": "emp_unit_cd",
+          "references_table": "pmm_unit",
+          "references_column": "emp_unit_cd",
+          "references_schema": "PM"
+        },
+        {
+          "column": "rep_loc_cd",
+          "references_table": "pmm_location",
+          "references_column": "emp_loc_cd",
+          "references_schema": "PM"
+        },
+        {
+          "column": "prev_rep_loc_cd",
+          "references_table": "pmm_location",
+          "references_column": "emp_loc_cd",
+          "references_schema": "PM"
+        },
+        {
+          "column": "prev_loc_cd",
+          "references_table": "pmm_location",
+          "references_column": "emp_loc_cd",
+          "references_schema": "PM"
+        },
+        {
+          "column": "prev_dept_cd",
+          "references_table": "pmm_department",
+          "references_column": "emp_dept_cd",
+          "references_schema": "PM"
+        },
+        {
+          "column": "prev_emp_unit_cd",
+          "references_table": "pmm_unit",
+          "references_column": "emp_unit_cd",
+          "references_schema": "PM"
+        },
+        {
+          "column": "emp_desig_cd",
+          "references_table": "pmm_designation",
+          "references_column": "emp_desig_cd",
+          "references_schema": "PM"
+        },
+        {
+          "column": "prev_desig_cd",
+          "references_table": "pmm_designation",
+          "references_column": "emp_desig_cd",
+          "references_schema": "PM"
+        },
+        {
+          "column": "inp_emp_no",
+          "references_table": "pmm_employee",
+          "references_column": "emp_no",
+          "references_schema": "PM"
+        },
+        {
+          "column": "can_emp_no",
+          "references_table": "pmm_employee",
+          "references_column": "emp_no",
+          "references_schema": "PM"
+        },
+        {
+          "column": "app_emp_no",
+          "references_table": "pmm_employee",
+          "references_column": "emp_no",
+          "references_schema": "PM"
+        },
+        {
+          "column": "rlv_by_emp_no",
+          "references_table": "pmm_employee",
+          "references_column": "emp_no",
+          "references_schema": "PM"
+        },
+        {
+          "column": "tkovr_by_emp_no",
+          "references_table": "pmm_employee",
+          "references_column": "emp_no",
+          "references_schema": "PM"
+        },
+        {
+          "column": "issued_by",
+          "references_table": "pmm_employee",
+          "references_column": "emp_no",
+          "references_schema": "PM"
+        }
+      ]
+    },
+    {
+      "table_name": "pmhk_grp",
+      "full_name": "PM.pmhk_grp",
+      "columns": [
+        "emp_grp_cd",
+        "group_desc",
+        "insurance_amt",
+        "welfare_amt",
+        "washing_allow",
+        "user_id",
+        "timestamp",
+        "user_ip"
+      ],
+      "columns_details": [
+        {
+          "column_name": "emp_grp_cd",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "group_desc",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "insurance_amt",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "welfare_amt",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "washing_allow",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "user_id",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "timestamp",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "user_ip",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        }
+      ],
+      "column_count": 8,
+      "primary_keys": [],
+      "foreign_keys": []
+    },
+    {
+      "table_name": "pmm_city",
+      "full_name": "PM.pmm_city",
+      "columns": [
+        "city_cd",
+        "city_class_type",
+        "city_desc",
+        "state_cd",
+        "emp_division_cd"
+      ],
+      "columns_details": [
+        {
+          "column_name": "city_cd",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "city_class_type",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "city_desc",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "state_cd",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "emp_division_cd",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        }
+      ],
+      "column_count": 5,
+      "primary_keys": [
+        "city_cd"
+      ],
+      "foreign_keys": []
+    }
+  ],
+  "SA": [
+    {
+      "table_name": "sam_appl",
+      "full_name": "SA.sam_appl",
+      "columns": [
+        "code",
+        "srno",
+        "descr",
+        "combintation",
+        "location"
+      ],
+      "columns_details": [
+        {
+          "column_name": "code",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "srno",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "descr",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "combintation",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "location",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        }
+      ],
+      "column_count": 5,
+      "primary_keys": [],
+      "foreign_keys": []
+    },
+    {
+      "table_name": "sam_role",
+      "full_name": "SA.sam_role",
+      "columns": [
+        "role_id",
+        "role_des",
+        "role_appl_flag",
+        "login_prog",
+        "logout_prog",
+        "func_code",
+        "role_cd",
+        "description"
+      ],
+      "columns_details": [
+        {
+          "column_name": "role_id",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "role_des",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "role_appl_flag",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "login_prog",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "logout_prog",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "func_code",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": true,
+          "is_nullable": true,
+          "references_table": "sam_function",
+          "references_column": "func_code"
+        },
+        {
+          "column_name": "role_cd",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "description",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        }
+      ],
+      "column_count": 8,
+      "primary_keys": [
+        "role_id"
+      ],
+      "foreign_keys": [
+        {
+          "column": "func_code",
+          "references_table": "sam_function",
+          "references_column": "func_code",
+          "references_schema": "SA"
+        }
+      ]
+    },
+    {
+      "table_name": "sam_user",
+      "full_name": "SA.sam_user",
+      "columns": [
+        "user_id",
+        "emp_no",
+        "user_status",
+        "exp_date",
+        "role_id",
+        "email",
+        "internet"
+      ],
+      "columns_details": [
+        {
+          "column_name": "user_id",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "emp_no",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": true,
+          "is_nullable": true,
+          "references_table": "pmm_employee",
+          "references_column": "emp_no"
+        },
+        {
+          "column_name": "user_status",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "exp_date",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "role_id",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": true,
+          "is_nullable": true,
+          "references_table": "sam_role",
+          "references_column": "role_id"
+        },
+        {
+          "column_name": "email",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "internet",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        }
+      ],
+      "column_count": 7,
+      "primary_keys": [
+        "user_id"
+      ],
+      "foreign_keys": [
+        {
+          "column": "emp_no",
+          "references_table": "pmm_employee",
+          "references_column": "emp_no",
+          "references_schema": "SA"
+        },
+        {
+          "column": "role_id",
+          "references_table": "sam_role",
+          "references_column": "role_id",
+          "references_schema": "SA"
+        }
+      ]
+    },
+    {
+      "table_name": "sap_sync",
+      "full_name": "SA.sap_sync",
+      "columns": [
+        "station",
+        "sync_date",
+        "num_of_days",
+        "type",
+        "flag"
+      ],
+      "columns_details": [
+        {
+          "column_name": "station",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "sync_date",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "num_of_days",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "type",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "flag",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        }
+      ],
+      "column_count": 5,
+      "primary_keys": [],
+      "foreign_keys": []
+    },
+    {
+      "table_name": "sat_used",
+      "full_name": "SA.sat_used",
+      "columns": [
+        "prog_fname"
+      ],
+      "columns_details": [
+        {
+          "column_name": "prog_fname",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        }
+      ],
+      "column_count": 1,
+      "primary_keys": [],
+      "foreign_keys": []
+    }
+  ],
+  "SI": [
+    {
+      "table_name": "sim_loc",
+      "full_name": "SI.sim_loc",
+      "columns": [
+        "loc_cd",
+        "loc_desc"
+      ],
+      "columns_details": [
+        {
+          "column_name": "loc_cd",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "loc_desc",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        }
+      ],
+      "column_count": 2,
+      "primary_keys": [
+        "loc_cd"
+      ],
+      "foreign_keys": []
+    },
+    {
+      "table_name": "sim_uom",
+      "full_name": "SI.sim_uom",
+      "columns": [
+        "uom",
+        "short_desc10",
+        "long_desc80"
+      ],
+      "columns_details": [
+        {
+          "column_name": "uom",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "short_desc10",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "long_desc80",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        }
+      ],
+      "column_count": 3,
+      "primary_keys": [
+        "uom"
+      ],
+      "foreign_keys": []
+    },
+    {
+      "table_name": "sihk_loc",
+      "full_name": "SI.sihk_loc",
+      "columns": [
+        "loc_cd",
+        "loc_desc",
+        "user_ip",
+        "user_id",
+        "time_stamp"
+      ],
+      "columns_details": [
+        {
+          "column_name": "loc_cd",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "loc_desc",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "user_ip",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "user_id",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "time_stamp",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        }
+      ],
+      "column_count": 5,
+      "primary_keys": [],
+      "foreign_keys": []
+    },
+    {
+      "table_name": "sihk_uom",
+      "full_name": "SI.sihk_uom",
+      "columns": [
+        "uom",
+        "short_desc10",
+        "long_desc80",
+        "user_ip",
+        "user_id",
+        "time_stamp"
+      ],
+      "columns_details": [
+        {
+          "column_name": "uom",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "short_desc10",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "long_desc80",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "user_ip",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "user_id",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "time_stamp",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        }
+      ],
+      "column_count": 6,
+      "primary_keys": [],
+      "foreign_keys": []
+    },
+    {
+      "table_name": "sim_ward",
+      "full_name": "SI.sim_ward",
+      "columns": [
+        "ward_cd",
+        "ward_desc",
+        "depot_cd"
+      ],
+      "columns_details": [
+        {
+          "column_name": "ward_cd",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "ward_desc",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "depot_cd",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": true,
+          "is_nullable": true,
+          "references_table": "sim_depot",
+          "references_column": "depot_cd"
+        }
+      ],
+      "column_count": 3,
+      "primary_keys": [
+        "ward_cd"
+      ],
+      "foreign_keys": [
+        {
+          "column": "depot_cd",
+          "references_table": "sim_depot",
+          "references_column": "depot_cd",
+          "references_schema": "SI"
+        }
+      ]
+    }
+  ],
+  "TA": [
+    {
+      "table_name": "tam_acf",
+      "full_name": "TA.tam_acf",
+      "columns": [
+        "class_cd",
+        "tkt_type",
+        "amount"
+      ],
+      "columns_details": [
+        {
+          "column_name": "class_cd",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "tkt_type",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "amount",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        }
+      ],
+      "column_count": 3,
+      "primary_keys": [
+        "class_cd",
+        "tkt_type"
+      ],
+      "foreign_keys": []
+    },
+    {
+      "table_name": "tam_group",
+      "full_name": "TA.tam_group",
+      "columns": [
+        "transaction_type",
+        "disg_flag",
+        "group_desc"
+      ],
+      "columns_details": [
+        {
+          "column_name": "transaction_type",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "disg_flag",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "group_desc",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        }
+      ],
+      "column_count": 3,
+      "primary_keys": [
+        "transaction_type",
+        "disg_flag"
+      ],
+      "foreign_keys": []
+    },
+    {
+      "table_name": "tam_param",
+      "full_name": "TA.tam_param",
+      "columns": [
+        "start_date",
+        "install_date",
+        "term_chrg",
+        "tranship_chrg"
+      ],
+      "columns_details": [
+        {
+          "column_name": "start_date",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "install_date",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "term_chrg",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "tranship_chrg",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        }
+      ],
+      "column_count": 4,
+      "primary_keys": [],
+      "foreign_keys": []
+    },
+    {
+      "table_name": "tat_scrdr",
+      "full_name": "TA.tat_scrdr",
+      "columns": [
+        "station_no",
+        "note_num",
+        "cr_dr_flag",
+        "cc_cf_flag",
+        "cash_out_flag",
+        "voucher_no",
+        "amount",
+        "reason_cd",
+        "doc_date",
+        "user_id",
+        "raised_by",
+        "remarks",
+        "auth_flag",
+        "auth_date",
+        "transfer_flag"
+      ],
+      "columns_details": [
+        {
+          "column_name": "station_no",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "note_num",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "cr_dr_flag",
+          "data_type": "PRIMARY KEY",
+          "is_primary_key": true,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "cc_cf_flag",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "cash_out_flag",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "voucher_no",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "amount",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "reason_cd",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "doc_date",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "user_id",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "raised_by",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "remarks",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "auth_flag",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "auth_date",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        },
+        {
+          "column_name": "transfer_flag",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        }
+      ],
+      "column_count": 15,
+      "primary_keys": [
+        "station_no",
+        "note_num",
+        "cr_dr_flag"
+      ],
+      "foreign_keys": []
+    },
+    {
+      "table_name": "tamk_party",
+      "full_name": "TA.tamk_party",
+      "columns": [
+        "party_cd",
+        "ta_party_cd"
+      ],
+      "columns_details": [
+        {
+          "column_name": "party_cd",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": true,
+          "is_nullable": true,
+          "references_table": "fam_party",
+          "references_column": "party_cd"
+        },
+        {
+          "column_name": "ta_party_cd",
+          "data_type": "VARCHAR",
+          "is_primary_key": false,
+          "is_foreign_key": false,
+          "is_nullable": true
+        }
+      ],
+      "column_count": 2,
+      "primary_keys": [],
+      "foreign_keys": [
+        {
+          "column": "party_cd",
+          "references_table": "fam_party",
+          "references_column": "party_cd",
+          "references_schema": "TA"
+        }
+      ]
+    }
+  ]
+}

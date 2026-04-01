@@ -1,0 +1,612 @@
+{
+  "GM": [
+    {
+      "table_name": "gmtk_fwd_dtl",
+      "full_name": "GM.gmtk_fwd_dtl",
+      "columns": 12,
+      "primary_keys": [
+        "complaint_no",
+        "forward_to",
+        "serial_no"
+      ],
+      "columns_list": [
+        "complaint_no",
+        "forward_from",
+        "forward_to",
+        "serial_no",
+        "auth_remarks",
+        "auth_remarks_file",
+        "auth_id",
+        "auth_time_stamp",
+        "hod_remarks",
+        "hod_remarks_file",
+        "hod_id",
+        "hod_time_stamp"
+      ]
+    },
+    {
+      "table_name": "gmtk_fwd_hdr",
+      "full_name": "GM.gmtk_fwd_hdr",
+      "columns": 5,
+      "primary_keys": [
+        "complaint_no",
+        "fwd_emp_no"
+      ],
+      "columns_list": [
+        "complaint_no",
+        "fwd_emp_no",
+        "currently_with",
+        "user_id",
+        "time_stamp"
+      ]
+    },
+    {
+      "table_name": "gmtk_fwd_hod",
+      "full_name": "GM.gmtk_fwd_hod",
+      "columns": 12,
+      "primary_keys": [
+        "complaint_no",
+        "forward_to",
+        "serial_no"
+      ],
+      "columns_list": [
+        "complaint_no",
+        "forward_from",
+        "forward_to",
+        "serial_no",
+        "hod_remarks",
+        "hod_remarks_file",
+        "hod_id",
+        "hod_time_stamp",
+        "auth_remarks",
+        "auth_remarks_file",
+        "auth_id",
+        "auth_time_stamp"
+      ]
+    },
+    {
+      "table_name": "gmtk_vis_txn",
+      "full_name": "GM.gmtk_vis_txn",
+      "columns": 21,
+      "primary_keys": [
+        "sr_no"
+      ],
+      "columns_list": [
+        "sr_no",
+        "location",
+        "name",
+        "company",
+        "address",
+        "city",
+        "state",
+        "mob_no",
+        "photo_no",
+        "p_flag",
+        "duration",
+        "purpose",
+        "vis_emp",
+        "token",
+        "vis_time",
+        "user_id",
+        "timestamp",
+        "ret_time",
+        "ret_user_id",
+        "ret_timestamp",
+        "a_flag"
+      ]
+    },
+    {
+      "table_name": "gmhk_coms_hdr",
+      "full_name": "GM.gmhk_coms_hdr",
+      "columns": 6,
+      "primary_keys": [],
+      "columns_list": [
+        "complaint_no",
+        "action_no",
+        "action_taken",
+        "action_taken_file",
+        "action_taken_id",
+        "time_stamp"
+      ]
+    }
+  ],
+  "HM": [
+    {
+      "table_name": "hmp_sys",
+      "full_name": "HM.hmp_sys",
+      "columns": 11,
+      "primary_keys": [
+        "hl_unit_cd",
+        "rate_per_km",
+        "case_acc1",
+        "case_acc2",
+        "case_periodic",
+        "case_sick",
+        "case_food",
+        "case_employment",
+        "case_promotion",
+        "reg_init_fee",
+        "reg_follow_fee"
+      ],
+      "columns_list": [
+        "hl_unit_cd",
+        "rate_per_km",
+        "case_acc1",
+        "case_acc2",
+        "case_periodic",
+        "case_sick",
+        "case_food",
+        "case_employment",
+        "case_promotion",
+        "reg_init_fee",
+        "reg_follow_fee"
+      ]
+    },
+    {
+      "table_name": "hmm_cont",
+      "full_name": "HM.hmm_cont",
+      "columns": 8,
+      "primary_keys": [
+        "contractor_cd"
+      ],
+      "columns_list": [
+        "contractor_cd",
+        "contractor_name",
+        "cont_addr1",
+        "cont_addr2",
+        "cont_addr3",
+        "city",
+        "state",
+        "pincode"
+      ]
+    },
+    {
+      "table_name": "hmm_drug",
+      "full_name": "HM.hmm_drug",
+      "columns": 3,
+      "primary_keys": [
+        "drug_cd"
+      ],
+      "columns_list": [
+        "drug_cd",
+        "drug_name",
+        "pl_no"
+      ]
+    },
+    {
+      "table_name": "hmt_xray",
+      "full_name": "HM.hmt_xray",
+      "columns": 14,
+      "primary_keys": [
+        "lab_reg_no",
+        "test_type_cd"
+      ],
+      "columns_list": [
+        "lab_reg_no",
+        "test_type_cd",
+        "test_dt",
+        "lung_parenchyma",
+        "vasculature",
+        "aortic_cardiac",
+        "bony_cage",
+        "pleural_spaces",
+        "domes_diaphragm",
+        "conclusion",
+        "observation_1",
+        "observation_2",
+        "observation_3",
+        "observation_4"
+      ]
+    },
+    {
+      "table_name": "hmp_param",
+      "full_name": "HM.hmp_param",
+      "columns": 8,
+      "primary_keys": [
+        "param_type",
+        "param_cd",
+        "from_dt"
+      ],
+      "columns_list": [
+        "param_type",
+        "param_cd",
+        "param_value",
+        "param_desc",
+        "from_dt",
+        "to_dt",
+        "user_id",
+        "user_timestamp"
+      ]
+    }
+  ],
+  "PM": [
+    {
+      "table_name": "pmm_ad",
+      "full_name": "PM.pmm_ad",
+      "columns": 16,
+      "primary_keys": [
+        "ad_cd"
+      ],
+      "columns_list": [
+        "ad_cd",
+        "ad_flg",
+        "ad_desc",
+        "ad_short_desc",
+        "allow_use_flag",
+        "tax_flag",
+        "rly_krcl_flg",
+        "section_id",
+        "tax_ben_cd",
+        "party_cd",
+        "max_amount",
+        "min_basic",
+        "max_basic",
+        "grp_eligible",
+        "ent_dept_code",
+        "ptax_flag"
+      ]
+    },
+    {
+      "table_name": "pmhk_ad",
+      "full_name": "PM.pmhk_ad",
+      "columns": 19,
+      "primary_keys": [
+        "ad_cd",
+        "timestamp"
+      ],
+      "columns_list": [
+        "ad_cd",
+        "ad_flg",
+        "ad_desc",
+        "ad_short_desc",
+        "allow_use_flag",
+        "tax_flag",
+        "rly_krcl_flg",
+        "section_id",
+        "tax_ben_cd",
+        "party_cd",
+        "max_amount",
+        "min_basic",
+        "max_basic",
+        "grp_eligible",
+        "ent_dept_code",
+        "ptax_flag",
+        "user_id",
+        "timestamp",
+        "user_ip"
+      ]
+    },
+    {
+      "table_name": "pmt_tfr",
+      "full_name": "PM.pmt_tfr",
+      "columns": 49,
+      "primary_keys": [
+        "emp_no",
+        "tfr_order_no",
+        "emp_report_to",
+        "emp_loc_cd",
+        "emp_dept_cd",
+        "emp_unit_cd",
+        "rep_loc_cd",
+        "prev_rep_loc_cd",
+        "prev_loc_cd",
+        "prev_dept_cd",
+        "prev_emp_unit_cd",
+        "emp_desig_cd",
+        "prev_desig_cd",
+        "inp_emp_no",
+        "can_emp_no",
+        "app_emp_no",
+        "rlv_by_emp_no",
+        "tkovr_by_emp_no",
+        "issued_by"
+      ],
+      "columns_list": [
+        "emp_no",
+        "tfr_order_no",
+        "tfr_order_dt",
+        "req_timestamp",
+        "tfr_type",
+        "reporting_dt",
+        "emp_report_to",
+        "stn_cde",
+        "emp_loc_cd",
+        "emp_dept_cd",
+        "emp_unit_cd",
+        "emp_rep_stn_cd",
+        "rep_loc_cd",
+        "admin_flg",
+        "safety_sen_flg",
+        "prev_rep_stn_cd",
+        "prev_rep_loc_cd",
+        "prev_stn_cde",
+        "prev_loc_cd",
+        "prev_dept_cd",
+        "prev_emp_unit_cd",
+        "prev_admin_flg",
+        "prev_saf_sen_flg",
+        "post_status",
+        "prev_post_status",
+        "emp_desig_cd",
+        "prev_desig_cd",
+        "cancel_flg",
+        "inp_emp_no",
+        "inp_timestamp",
+        "tfr_status_flg",
+        "promotion_let_no",
+        "pay_flag",
+        "can_timestamp",
+        "can_emp_no",
+        "relieving_dt",
+        "take_over_dt",
+        "tfr_days",
+        "prev_att_stn",
+        "prev_att_loc",
+        "app_emp_no",
+        "remarks",
+        "rlv_by_emp_no",
+        "tkovr_by_emp_no",
+        "tkovr_timestamp",
+        "issued_by",
+        "issue_timestamp",
+        "prev_emp_report_to",
+        "prom_flg"
+      ]
+    },
+    {
+      "table_name": "pmhk_grp",
+      "full_name": "PM.pmhk_grp",
+      "columns": 8,
+      "primary_keys": [],
+      "columns_list": [
+        "emp_grp_cd",
+        "group_desc",
+        "insurance_amt",
+        "welfare_amt",
+        "washing_allow",
+        "user_id",
+        "timestamp",
+        "user_ip"
+      ]
+    },
+    {
+      "table_name": "pmm_city",
+      "full_name": "PM.pmm_city",
+      "columns": 5,
+      "primary_keys": [
+        "city_cd"
+      ],
+      "columns_list": [
+        "city_cd",
+        "city_class_type",
+        "city_desc",
+        "state_cd",
+        "emp_division_cd"
+      ]
+    }
+  ],
+  "SA": [
+    {
+      "table_name": "sam_appl",
+      "full_name": "SA.sam_appl",
+      "columns": 5,
+      "primary_keys": [],
+      "columns_list": [
+        "code",
+        "srno",
+        "descr",
+        "combintation",
+        "location"
+      ]
+    },
+    {
+      "table_name": "sam_role",
+      "full_name": "SA.sam_role",
+      "columns": 8,
+      "primary_keys": [
+        "role_id",
+        "func_code"
+      ],
+      "columns_list": [
+        "role_id",
+        "role_des",
+        "role_appl_flag",
+        "login_prog",
+        "logout_prog",
+        "func_code",
+        "role_cd",
+        "description"
+      ]
+    },
+    {
+      "table_name": "sam_user",
+      "full_name": "SA.sam_user",
+      "columns": 7,
+      "primary_keys": [
+        "user_id",
+        "emp_no",
+        "role_id"
+      ],
+      "columns_list": [
+        "user_id",
+        "emp_no",
+        "user_status",
+        "exp_date",
+        "role_id",
+        "email",
+        "internet"
+      ]
+    },
+    {
+      "table_name": "sap_sync",
+      "full_name": "SA.sap_sync",
+      "columns": 5,
+      "primary_keys": [],
+      "columns_list": [
+        "station",
+        "sync_date",
+        "num_of_days",
+        "type",
+        "flag"
+      ]
+    },
+    {
+      "table_name": "sat_used",
+      "full_name": "SA.sat_used",
+      "columns": 1,
+      "primary_keys": [],
+      "columns_list": [
+        "prog_fname"
+      ]
+    }
+  ],
+  "SI": [
+    {
+      "table_name": "sim_loc",
+      "full_name": "SI.sim_loc",
+      "columns": 2,
+      "primary_keys": [
+        "loc_cd"
+      ],
+      "columns_list": [
+        "loc_cd",
+        "loc_desc"
+      ]
+    },
+    {
+      "table_name": "sim_uom",
+      "full_name": "SI.sim_uom",
+      "columns": 3,
+      "primary_keys": [
+        "uom"
+      ],
+      "columns_list": [
+        "uom",
+        "short_desc10",
+        "long_desc80"
+      ]
+    },
+    {
+      "table_name": "sihk_loc",
+      "full_name": "SI.sihk_loc",
+      "columns": 5,
+      "primary_keys": [],
+      "columns_list": [
+        "loc_cd",
+        "loc_desc",
+        "user_ip",
+        "user_id",
+        "time_stamp"
+      ]
+    },
+    {
+      "table_name": "sihk_uom",
+      "full_name": "SI.sihk_uom",
+      "columns": 6,
+      "primary_keys": [],
+      "columns_list": [
+        "uom",
+        "short_desc10",
+        "long_desc80",
+        "user_ip",
+        "user_id",
+        "time_stamp"
+      ]
+    },
+    {
+      "table_name": "sim_ward",
+      "full_name": "SI.sim_ward",
+      "columns": 3,
+      "primary_keys": [
+        "ward_cd",
+        "depot_cd"
+      ],
+      "columns_list": [
+        "ward_cd",
+        "ward_desc",
+        "depot_cd"
+      ]
+    }
+  ],
+  "TA": [
+    {
+      "table_name": "tam_acf",
+      "full_name": "TA.tam_acf",
+      "columns": 3,
+      "primary_keys": [
+        "class_cd",
+        "tkt_type"
+      ],
+      "columns_list": [
+        "class_cd",
+        "tkt_type",
+        "amount"
+      ]
+    },
+    {
+      "table_name": "tam_group",
+      "full_name": "TA.tam_group",
+      "columns": 3,
+      "primary_keys": [
+        "transaction_type",
+        "disg_flag"
+      ],
+      "columns_list": [
+        "transaction_type",
+        "disg_flag",
+        "group_desc"
+      ]
+    },
+    {
+      "table_name": "tam_param",
+      "full_name": "TA.tam_param",
+      "columns": 4,
+      "primary_keys": [],
+      "columns_list": [
+        "start_date",
+        "install_date",
+        "term_chrg",
+        "tranship_chrg"
+      ]
+    },
+    {
+      "table_name": "tat_scrdr",
+      "full_name": "TA.tat_scrdr",
+      "columns": 15,
+      "primary_keys": [
+        "station_no",
+        "note_num",
+        "cr_dr_flag"
+      ],
+      "columns_list": [
+        "station_no",
+        "note_num",
+        "cr_dr_flag",
+        "cc_cf_flag",
+        "cash_out_flag",
+        "voucher_no",
+        "amount",
+        "reason_cd",
+        "doc_date",
+        "user_id",
+        "raised_by",
+        "remarks",
+        "auth_flag",
+        "auth_date",
+        "transfer_flag"
+      ]
+    },
+    {
+      "table_name": "tamk_party",
+      "full_name": "TA.tamk_party",
+      "columns": 2,
+      "primary_keys": [
+        "party_cd"
+      ],
+      "columns_list": [
+        "party_cd",
+        "ta_party_cd"
+      ]
+    }
+  ]
+}
