@@ -1,11 +1,8 @@
 from pypika import Query, Table, Field, functions as fn
-from typing import List, Dict, Optional, Union, Any
-import pandas as pd
+from typing import List, Dict, Optional, Union, Any, TYPE_CHECKING
 
 from db_information import DBInfo
-from pypika_query_engine import QueryGenerator
 from temporary_table import TemporaryTable
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pypika_query_engine import QueryGenerator

@@ -5,13 +5,13 @@ interface QueryTypeToggleProps {
   onChange: (v: QueryType) => void;
 }
 
-const TYPES: { value: QueryType; label: string; icon: string }[] = [
-  { value: "select", label: "Simple SELECT", icon: "📋" },
-  { value: "join", label: "JOIN Query", icon: "🔗" },
-  { value: "aggregate", label: "Aggregate", icon: "📊" },
-  { value: "union", label: "UNION", icon: "🔄" },
-  { value: "date_range", label: "Date Range", icon: "📅" },
-  { value: "raw", label: "Raw SQL", icon: "✍️" },
+const TYPES: { value: QueryType; label: string; icon: string; desc: string }[] = [
+  { value: "select",     label: "Simple SELECT", icon: "📋", desc: "Fetch rows from one table" },
+  { value: "join",       label: "JOIN",          icon: "🔗", desc: "Combine two or more tables" },
+  { value: "aggregate",  label: "Aggregate",     icon: "📊", desc: "COUNT, SUM, AVG, MIN, MAX" },
+  { value: "union",      label: "UNION",         icon: "🔄", desc: "Stack results from multiple tables" },
+  { value: "date_range", label: "Date Range",    icon: "📅", desc: "Filter by date period" },
+  { value: "raw",        label: "Raw SQL",       icon: "✍️", desc: "Write your own SQL" },
 ];
 
 const QueryTypeToggle = ({ value, onChange }: QueryTypeToggleProps) => {
@@ -21,13 +21,14 @@ const QueryTypeToggle = ({ value, onChange }: QueryTypeToggleProps) => {
         <button
           key={t.value}
           onClick={() => onChange(t.value)}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all border ${
-            value === t.value
-              ? "bg-primary text-primary-foreground border-primary shadow-md"
-              : "bg-card text-foreground border-border hover:border-secondary hover:bg-muted"
-          }`}
+          title={t.desc}
+          className={`query-type-btn ${value === t.value ? "query-type-btn-active" : "query-type-btn-inactive"}`}
         >
-          {t.icon} {t.label}
+          <span className="text-xl">{t.icon}</span>
+          <span className="font-semibold text-xs">{t.label}</span>
+          <span className={`text-[10px] leading-tight ${value === t.value ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+            {t.desc}
+          </span>
         </button>
       ))}
     </div>

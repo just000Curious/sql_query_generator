@@ -10,13 +10,18 @@ from collections import deque
 import pathlib
 
 
+# Resolve default JSON path relative to this file
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+_DEFAULT_JSON_PATH = os.path.join(_THIS_DIR, "db_files", "metadata.json")
+
+
 class CSVDBInfo:
     """
     Database Information Module - Loads schema from JSON file
     Provides metadata for the SQL Query Generator API
     """
 
-    def __init__(self, json_file_path: str = r"G:\sql query generator\db_files\metadata.json"):
+    def __init__(self, json_file_path: str = _DEFAULT_JSON_PATH):
         """
         Load schema from JSON file
 
@@ -37,9 +42,9 @@ class CSVDBInfo:
             "GM": "General Management",
             "HM": "Healthcare Management",
             "PM": "Personnel Management",
-            "SI": "System Integration",
-            "SA": "Sales & Admin",
-            "TA": "Taxation & Finance"
+            "SI": "Stores & Inventory",
+            "SA": "Security & Administration",
+            "TA": "Traffic & Accounts",
         }
 
         # Target schemas
@@ -203,8 +208,17 @@ class CSVDBInfo:
         return None
 
     def _add_common_column_relationships(self):
-        """Add relationships based on common column names"""
+        """Add relationships based on common column names (optimized).
+        
+        Instead of creating O(n²) pairs, we only link each table to the 
+        first table found containing that column (star topology),
+        keeping the relationship count manageable.
+        """
         common_columns = ['emp_no', 'complaint_no', 'case_reg_no', 'dept_cd', 'desig_cd']
+
+        existing = set()
+        for rel in self.relationships:
+            existing.add((rel['from_table'], rel['to_table'], rel['from_column']))
 
         for col_name in common_columns:
             tables_with_col = []
@@ -212,39 +226,31 @@ class CSVDBInfo:
                 for col in columns:
                     if col['column_name'] == col_name:
                         schema, table = full_name.split('.')
-                        tables_with_col.append({
-                            'full_name': full_name,
-                            'schema': schema,
-                            'table': table,
-                            'column': col_name
-                        })
+                        tables_with_col.append((schema, table))
+                        break  # column found in this table, move on
 
-            # Create relationships between tables that share this column
-            for i, t1 in enumerate(tables_with_col):
-                for t2 in tables_with_col[i+1:]:
-                    if t1['full_name'] == t2['full_name']:
-                        continue
+            if len(tables_with_col) < 2:
+                continue
 
-                    rel = {
-                        'from_schema': t1['schema'],
-                        'from_table': t1['table'],
-                        'from_column': col_name,
-                        'to_schema': t2['schema'],
-                        'to_table': t2['table'],
-                        'to_column': col_name
-                    }
+            # Star topology: link every table to the first one (hub)
+            hub_schema, hub_table = tables_with_col[0]
+            for schema, table in tables_with_col[1:]:
+                if table == hub_table:
+                    continue
+                key = (table, hub_table, col_name)
+                rev_key = (hub_table, table, col_name)
+                if key in existing or rev_key in existing:
+                    continue
 
-                    # Check if this relationship already exists
-                    exists = False
-                    for existing in self.relationships:
-                        if (existing['from_table'] == rel['from_table'] and
-                            existing['to_table'] == rel['to_table'] and
-                            existing['from_column'] == rel['from_column']):
-                            exists = True
-                            break
-
-                    if not exists:
-                        self.relationships.append(rel)
+                self.relationships.append({
+                    'from_schema': schema,
+                    'from_table': table,
+                    'from_column': col_name,
+                    'to_schema': hub_schema,
+                    'to_table': hub_table,
+                    'to_column': col_name
+                })
+                existing.add(key)
 
     def _infer_data_type(self, column_name: str, table_name: str) -> str:
         """Infer data type from column name patterns"""
@@ -321,14 +327,11 @@ class CSVDBInfo:
             self.primary_keys[full_name] = ['case_reg_no']
             self.loaded_tables_count += 1
 
-        # Add more test data as needed...
-
         # Add relationships
         self._add_test_relationships()
 
     def _add_test_relationships(self):
         """Add test relationships"""
-        # HM to PM relationship
         for table in ['hmt_case_reg', 'hmt_cln_exam', 'hmt_lab_reg']:
             self.relationships.append({
                 'from_schema': 'HM',
@@ -467,6 +470,102 @@ class CSVDBInfo:
                         'to_column': rel['from_column']
                     }
         return None
+
+    def find_join_path(self, table_tuples: List[Tuple[str, Optional[str]]]) -> List[Dict]:
+        """
+        Find a join path between multiple tables using BFS over the relationship graph.
+
+        Args:
+            table_tuples: List of (table_name, schema_name) tuples
+
+        Returns:
+            List of join step dicts with from/to table, column, schema info
+        """
+        if len(table_tuples) < 2:
+            return []
+
+        # Build adjacency list from relationships
+        adjacency: Dict[str, List[Dict]] = {}
+        for rel in self.relationships:
+            key_from = rel['from_table']
+            key_to = rel['to_table']
+
+            if key_from not in adjacency:
+                adjacency[key_from] = []
+            adjacency[key_from].append({
+                'to_table': key_to,
+                'to_schema': rel['to_schema'],
+                'from_column': rel['from_column'],
+                'to_column': rel['to_column'],
+                'from_schema': rel['from_schema'],
+            })
+
+            if key_to not in adjacency:
+                adjacency[key_to] = []
+            adjacency[key_to].append({
+                'to_table': key_from,
+                'to_schema': rel['from_schema'],
+                'from_column': rel['to_column'],
+                'to_column': rel['from_column'],
+                'from_schema': rel['to_schema'],
+            })
+
+        # BFS from the first table to each subsequent table
+        join_path = []
+        visited_tables = {table_tuples[0][0]}
+
+        for i in range(1, len(table_tuples)):
+            target_table = table_tuples[i][0]
+            target_schema = table_tuples[i][1]
+
+            if target_table in visited_tables:
+                continue
+
+            # BFS
+            queue = deque()
+            # seed: all currently visited tables
+            for vt in visited_tables:
+                queue.append((vt, []))
+
+            found = False
+            bfs_visited = set(visited_tables)
+
+            while queue and not found:
+                current, path = queue.popleft()
+
+                for edge in adjacency.get(current, []):
+                    next_table = edge['to_table']
+                    if next_table in bfs_visited:
+                        continue
+
+                    new_path = path + [{
+                        'from_table': current,
+                        'from_schema': edge.get('from_schema', self.table_schema.get(current)),
+                        'from_alias': current,
+                        'from_column': edge['from_column'],
+                        'to_table': next_table,
+                        'to_schema': edge['to_schema'],
+                        'to_alias': next_table,
+                        'to_column': edge['to_column'],
+                        'join_type': 'INNER JOIN',
+                        'relationship_type': 'forward'
+                    }]
+
+                    if next_table == target_table:
+                        join_path.extend(new_path)
+                        for step in new_path:
+                            visited_tables.add(step['to_table'])
+                        found = True
+                        break
+
+                    bfs_visited.add(next_table)
+                    queue.append((next_table, new_path))
+
+            if not found:
+                # No path found — return empty so caller can handle
+                return []
+
+        return join_path
 
     def get_direct_relationships(self, table_name: str, schema_name: Optional[str] = None) -> List[Dict]:
         """Get all tables directly related to this table"""

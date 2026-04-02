@@ -1,9 +1,8 @@
 """
 Filter Templates - Predefined filter patterns for common query patterns
 """
-from datetime import timedelta
+from datetime import datetime, date, timedelta
 from typing import Optional, List, Dict, Any, Union
-from datetime import datetime, date, timedelta  # Add timedelta here
 from pypika_query_engine import QueryGenerator, RawExpression
 
 class DateRangeFilter:
@@ -122,5 +121,8 @@ class FilterTemplate:
     def financial_year(column: str, year: int, start_month: int = 4) -> DateRangeBuilder:
         """Filter for financial year (default: April-March)"""
         start = f"{year}-{start_month:02d}-01"
-        end = f"{year + 1}-{start_month - 1:02d}-30"
+        end_month = start_month - 1 if start_month > 1 else 12
+        end_year = year + 1 if start_month > 1 else year
+        end_day = DateRangeBuilder()._days_in_month(end_year, end_month)
+        end = f"{end_year}-{end_month:02d}-{end_day}"
         return DateRangeBuilder().add_range(column, start, end)

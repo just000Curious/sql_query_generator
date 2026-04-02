@@ -1,7 +1,7 @@
 from pypika import Query, Table, Field, Order, functions as fn
 from pypika.terms import Criterion, Term
 from typing import List, Dict, Optional, Union, Any
-import pandas as pd
+from datetime import datetime, date
 import re
 
 
@@ -54,6 +54,7 @@ class QueryGenerator:
         self.conditions = []
         self.group_by_cols = []
         self.having_conditions = []
+        self.having_raw = []
         self.order_by_cols = []
         self.limit_val = None
         self.offset_val = None
@@ -94,6 +95,12 @@ class QueryGenerator:
 
         self.query = self.query.select(*fields)
         self.selected_columns = columns
+        return self
+
+    def select_distinct(self):
+        """Enable DISTINCT on query"""
+        self.is_distinct = True
+        self.query = self.query.distinct()
         return self
 
     def select_all(self):
@@ -322,6 +329,14 @@ class QueryGenerator:
 
         return self
 
+    def having(self, column: str, operator: str, value: Any):
+        """Add HAVING condition"""
+        field = self._get_field(column)
+        condition = self._build_condition(field, operator, value)
+        self.query = self.query.having(condition)
+        self.having_raw.append((column, operator, value))
+        return self
+
     def build(self) -> str:
         """Build and return the SQL query string"""
         return str(self.query)
@@ -335,12 +350,9 @@ class QueryGenerator:
             'selected_columns': self.selected_columns,
             'conditions': self.conditions,
             'group_by': self.group_by_cols,
+            'having': self.having_raw,
             'order_by': self.order_by_cols,
             'limit': self.limit_val,
             'offset': self.offset_val,
             'is_distinct': self.is_distinct
         }
-
-
-# Add import for datetime at the top of the file
-from datetime import datetime, date

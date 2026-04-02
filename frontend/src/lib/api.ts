@@ -7,7 +7,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(err.detail || err.message || "Request failed");
+    throw new Error(err.detail || err.error || err.message || "Request failed");
   }
   return res.json();
 }
@@ -33,15 +33,27 @@ export interface GenerateQueryRequest {
   tables: { table: string; schema: string; alias: string }[];
   columns: { table: string; column: string; alias?: string }[];
   conditions: { table: string; column: string; operator: string; value: string }[];
+  joins?: {
+    join_type: string;
+    from_alias: string;
+    from_column: string;
+    to_alias: string;
+    to_column: string;
+  }[];
+  aggregates?: { func: string; column: string; alias: string }[];
   limit?: number;
   offset?: number;
   order_by?: { column: string; direction: string }[];
   group_by?: string[];
+  having?: { table: string; column: string; operator: string; value: string }[];
+  distinct?: boolean;
 }
 
 export interface GenerateQueryResponse {
   success: boolean;
   query: string;
+  error?: string;
+  execution_time?: number;
   metadata?: Record<string, unknown>;
 }
 
@@ -51,14 +63,16 @@ export interface ExecuteQueryResponse {
   columns: string[];
   row_count: number;
   execution_time: number;
+  message?: string;
+  sql?: string;
 }
 
 export const api = {
   createSession: () => request<Session>("/sessions/create", { method: "POST" }),
 
-  getCategories: () => request<string[]>("/categories"),
+  getCategories: () => request<Record<string, string>>("/categories"),
 
-  getSchemas: () => request<{ schemas: string[] } | string[]>("/schemas"),
+  getSchemas: () => request<{ schemas: string[]; count: number } | string[]>("/schemas"),
 
   getTables: (schema: string) =>
     request<{ tables: string[] } | string[]>(`/tables?schema=${encodeURIComponent(schema)}`),
@@ -72,10 +86,10 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
-  executeQuery: (sessionId: string, sql: string, validate = true) =>
-    request<ExecuteQueryResponse>(`/query/execute?session_id=${encodeURIComponent(sessionId)}`, {
+  executeQuery: (sql: string, limit = 1000) =>
+    request<ExecuteQueryResponse>("/query/execute", {
       method: "POST",
-      body: JSON.stringify({ sql, validate }),
+      body: JSON.stringify({ sql, limit }),
     }),
 
   unionQuery: (queries: GenerateQueryRequest[], operation: string, wrapInCte?: string) =>
