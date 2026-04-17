@@ -1,4 +1,4 @@
-type QueryType = "select" | "join" | "aggregate" | "union" | "date_range" | "raw";
+type QueryType = "select" | "join" | "aggregate" | "date_range" | "raw";
 
 interface QueryTypeToggleProps {
   value: QueryType;
@@ -9,7 +9,6 @@ const TYPES: { value: QueryType; label: string; icon: string; desc: string }[] =
   { value: "select",     label: "Simple SELECT", icon: "📋", desc: "Fetch rows from one table" },
   { value: "join",       label: "JOIN",          icon: "🔗", desc: "Combine two or more tables" },
   { value: "aggregate",  label: "Aggregate",     icon: "📊", desc: "COUNT, SUM, AVG, MIN, MAX" },
-  { value: "union",      label: "UNION",         icon: "🔄", desc: "Stack results from multiple tables" },
   { value: "date_range", label: "Date Range",    icon: "📅", desc: "Filter by date period" },
   { value: "raw",        label: "Raw SQL",       icon: "✍️", desc: "Write your own SQL" },
 ];

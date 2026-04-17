@@ -10,7 +10,6 @@ import AggregateBuilder, { type AggregateConfig } from "@/components/AggregateBu
 import DateRangeFilter from "@/components/DateRangeFilter";
 import GroupOrderOptions from "@/components/GroupOrderOptions";
 import SqlPreview from "@/components/SqlPreview";
-import UnionBuilder from "@/components/UnionBuilder";
 import TempTableOptions from "@/components/TempTableOptions";
 import ValidationPanel from "@/components/ValidationPanel";
 import HelpModal from "@/components/HelpModal";
@@ -18,7 +17,9 @@ import { HistoryPanel } from "@/components/HistoryPanel";
 import { api } from "@/lib/api";
 import { addToHistory } from "@/lib/query-history";
 import { toast } from "sonner";
-import { Wand2, Loader2 } from "lucide-react";
+import { Wand2, Loader2, Plus, Trash2, Layers } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 
 const Index = () => {
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -45,7 +46,7 @@ const Index = () => {
   // SQL state
   const [sql, setSql] = useState("");           // raw generated SQL from builder/API
   const [displaySql, setDisplaySql] = useState(""); // possibly wrapped (temp table / CTE)
-  const [unionSql, setUnionSql] = useState("");  // live SQL from UnionBuilder
+  const [queryStack, setQueryStack] = useState<{id: string, sql: string, connector: string}[]>([]); // Stacks for UNION
   const [generating, setGenerating] = useState(false);
   const [executing, setExecuting] = useState(false);
 
@@ -56,8 +57,17 @@ const Index = () => {
       .catch(() => setSessionId("local-" + crypto.randomUUID().slice(0, 8)));
   }, []);
 
+  const finalRawSql = useMemo(() => {
+    if (queryStack.length === 0) return sql;
+    let stacked = "";
+    queryStack.forEach((part) => {
+      stacked += `${part.sql}\n\n${part.connector}\n\n`;
+    });
+    return stacked + (sql || "/* Build the next query part below... */");
+  }, [queryStack, sql]);
+
   // Keep displaySql in sync when not temp-wrapped
-  useEffect(() => { setDisplaySql(sql); }, [sql]);
+  useEffect(() => { setDisplaySql(finalRawSql); }, [finalRawSql]);
 
   const clearAll = () => {
     setQueryType("select");
@@ -76,7 +86,7 @@ const Index = () => {
     setRawSql("");
     setSql("");
     setDisplaySql("");
-    setUnionSql("");
+    setQueryStack([]);
     setDistinct(false);
     toast.info("All fields cleared");
   };
@@ -277,7 +287,7 @@ const Index = () => {
     const errors: string[] = [];
     const warnings: string[] = [];
 
-    if (queryType === "raw" || queryType === "union") return { errors, warnings };
+    if (queryType === "raw") return { errors, warnings };
     if (selectedTables.length === 0) return { errors, warnings };
 
     // Build alias → SelectedTable map
@@ -350,8 +360,8 @@ const Index = () => {
   }, [queryType, selectedTables, selectedColumns, joins, conditions]);
 
   // The SQL to show in the preview panel
-  const previewSql = queryType === "union" ? unionSql : displaySql;
-  const hasOutput = !!(sql || unionSql);
+  const previewSql = displaySql;
+  const hasOutput = !!finalRawSql;
   const canGenerate = validation.errors.length === 0;
 
   return (
@@ -371,17 +381,7 @@ const Index = () => {
           <QueryTypeToggle value={queryType} onChange={setQueryType} />
         </SectionCard>
 
-        {/* ── UNION builder ── */}
-        {queryType === "union" && (
-          <SectionCard
-            title="UNION Query Builder"
-            icon="🔄"
-            stepNum={2}
-            hint="Stack results from multiple SELECT queries side by side"
-          >
-            <UnionBuilder onSqlChange={setUnionSql} />
-          </SectionCard>
-        )}
+
 
         {/* ── Raw SQL editor ── */}
         {queryType === "raw" && (
@@ -400,7 +400,7 @@ const Index = () => {
         )}
 
         {/* ── Standard builder (select / join / aggregate / date_range) ── */}
-        {queryType !== "union" && queryType !== "raw" && (
+        {queryType !== "raw" && (
           <>
             {/* Step 2 — Table & Columns */}
             <SectionCard
@@ -537,41 +537,97 @@ const Index = () => {
         )}
 
         {/* Validation Panel + Generate Button — hidden for UNION (auto-generates live) */}
-        {queryType !== "union" && (
-          <div className="space-y-3">
-            {/* Live validation feedback */}
-            {selectedTables.length > 0 && queryType !== "raw" && (
-              <ValidationPanel result={validation} />
-            )}
+        <div className="space-y-3">
+          {/* Live validation feedback */}
+          {selectedTables.length > 0 && queryType !== "raw" && (
+            <ValidationPanel result={validation} />
+          )}
 
-            {/* Generate button */}
-            <div id="generate-section" className="flex flex-col items-center gap-3 py-2">
-              <button
-                id="generate-btn"
-                onClick={handleGenerate}
-                disabled={generating || (queryType !== "raw" && selectedTables.length === 0) || !canGenerate}
-                className="generate-btn"
-                title={!canGenerate ? "Fix validation errors above before generating" : undefined}
+          {/* Generate button */}
+          <div id="generate-section" className="flex flex-col items-center gap-3 py-2">
+            <button
+              id="generate-btn"
+              onClick={handleGenerate}
+              disabled={generating || (queryType !== "raw" && selectedTables.length === 0) || !canGenerate}
+              className="generate-btn"
+              title={!canGenerate ? "Fix validation errors above before generating" : undefined}
+            >
+              {generating
+                ? <><Loader2 className="h-5 w-5 animate-spin" /> Generating…</>
+                : <><Wand2 className="h-5 w-5" /> Generate SQL Query</>
+              }
+            </button>
+            {(sql) && (
+              <Button
+                variant="outline"
+                className="mt-2 text-primary font-medium border border-primary/30 bg-background/50 backdrop-blur-sm shadow-sm"
+                onClick={() => {
+                  setQueryStack([
+                    ...queryStack,
+                    { id: crypto.randomUUID(), sql: sql, connector: "UNION ALL" },
+                  ]);
+                  setSql("");    // Clear current SQL so they can generate the next part
+                  setRawSql(""); // Clear raw mode if they used that
+                  toast.success("Added to UNION stack. Modify the builder below for the next part and generate again.");
+                }}
               >
-                {generating
-                  ? <><Loader2 className="h-5 w-5 animate-spin" /> Generating…</>
-                  : <><Wand2 className="h-5 w-5" /> Generate SQL Query</>
-                }
-              </button>
-              {!canGenerate && (
-                <p className="text-xs text-destructive font-medium">
-                  Fix the {validation.errors.length} error{validation.errors.length > 1 ? "s" : ""} above to enable generation.
-                </p>
-              )}
-              {canGenerate && (
-                <p className="text-xs text-muted-foreground">
-                  Keyboard shortcut: <kbd className="bg-muted border border-border px-1.5 py-0.5 rounded text-[10px]">Ctrl + Enter</kbd>
-                </p>
-              )}
-            </div>
+                <Plus className="h-4 w-4 mr-1.5" /> Add to UNION Stack (Continue Building)
+              </Button>
+            )}
+            {!canGenerate && (
+              <p className="text-xs text-destructive font-medium">
+                Fix the {validation.errors.length} error{validation.errors.length > 1 ? "s" : ""} above to enable generation.
+              </p>
+            )}
+            {canGenerate && (
+              <p className="text-xs text-muted-foreground">
+                Keyboard shortcut: <kbd className="bg-muted border border-border px-1.5 py-0.5 rounded text-[10px]">Ctrl + Enter</kbd>
+              </p>
+            )}
           </div>
-        )}
+        </div>
 
+
+        {/* UNION Query Stack Display */}
+        {queryStack.length > 0 && (
+          <SectionCard title="UNION Query Stack" icon="🥞" hint="Queries are chained sequentially">
+            <div className="space-y-2">
+              {queryStack.map((part, index) => (
+                <div key={part.id} className="flex items-center gap-3 p-3 bg-muted/30 border border-border rounded-lg">
+                  <div className="flex-1 overflow-hidden">
+                    <p className="text-xs font-mono text-muted-foreground truncate"><span className="text-primary font-bold mr-2">Part {index+1}</span> {part.sql.split('\n')[0]} ...</p>
+                  </div>
+                  <Select value={part.connector} onValueChange={(v) => {
+                    const newStack = [...queryStack];
+                    newStack[index].connector = v;
+                    setQueryStack(newStack);
+                  }}>
+                    <SelectTrigger className="w-36 h-8 text-xs font-bold text-secondary border-secondary/40 bg-secondary/5">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="UNION">UNION (deduplicate)</SelectItem>
+                      <SelectItem value="UNION ALL">UNION ALL (keep all)</SelectItem>
+                      <SelectItem value="INTERSECT">INTERSECT (common rows)</SelectItem>
+                      <SelectItem value="EXCEPT">EXCEPT (subtract rows)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive/70 hover:text-destructive hover:bg-destructive/10" onClick={() => {
+                    setQueryStack(queryStack.filter(p => p.id !== part.id));
+                  }}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+            {!sql && (
+              <p className="text-xs text-amber-500 mt-4 flex items-start gap-2 bg-amber-500/10 p-2.5 rounded border border-amber-500/20">
+                <Layers className="h-4 w-4 shrink-0 mt-0.5" /> 
+                <span>You have a query in the stack but the current builder is empty. You must <strong>generate at least one more query</strong> using the builder above to complete the UNION sequence!</span>
+              </p>
+            )}
+          </SectionCard>
+        )}
 
         {/* Generated SQL output */}
         {hasOutput && (
@@ -595,7 +651,7 @@ const Index = () => {
               hint="Optional — store the result as a reusable named table or subquery"
             >
               <TempTableOptions
-                sql={queryType === "union" ? unionSql : sql}
+                sql={finalRawSql}
                 onWrappedSqlChange={setDisplaySql}
               />
             </SectionCard>

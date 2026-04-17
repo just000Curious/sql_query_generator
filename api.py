@@ -10,10 +10,14 @@ import json
 import time
 import traceback
 import uuid
+import warnings
 from contextlib import asynccontextmanager
 from datetime import datetime, date
 from typing import Optional, List, Dict, Any, Union
 import logging
+
+# Suppress Pydantic warning for "schema" field shadowing
+warnings.filterwarnings("ignore", message='Field name "schema" .* shadows an attribute .*')
 
 # Add current directory to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
