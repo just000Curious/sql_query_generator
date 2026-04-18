@@ -1,65 +1,48 @@
 {
-  "builds": [
+  "rewrites": [
     {
-      "src": "api.py",
-      "use": "@vercel/python"
+      "source": "/health",
+      "destination": "/api/index.py"
     },
     {
-      "src": "frontend/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
-    }
-  ],
-  "routes": [
-    {
-      "src": "/health",
-      "dest": "/api.py"
+      "source": "/schemas(.*)",
+      "destination": "/api/index.py"
     },
     {
-      "src": "/schemas(.*)",
-      "dest": "/api.py"
+      "source": "/categories(.*)",
+      "destination": "/api/index.py"
     },
     {
-      "src": "/categories(.*)",
-      "dest": "/api.py"
+      "source": "/query/(.*)",
+      "destination": "/api/index.py"
     },
     {
-      "src": "/query/(.*)",
-      "dest": "/api.py"
+      "source": "/search/(.*)",
+      "destination": "/api/index.py"
     },
     {
-      "src": "/search/(.*)",
-      "dest": "/api.py"
+      "source": "/stats",
+      "destination": "/api/index.py"
     },
     {
-      "src": "/stats",
-      "dest": "/api.py"
+      "source": "/sessions/(.*)",
+      "destination": "/api/index.py"
     },
     {
-      "src": "/sessions/(.*)",
-      "dest": "/api.py"
+      "source": "/tables(.*)",
+      "destination": "/api/index.py"
     },
     {
-      "src": "/tables(.*)",
-      "dest": "/api.py"
+      "source": "/samples",
+      "destination": "/api/index.py"
     },
     {
-      "src": "/samples",
-      "dest": "/api.py"
+      "source": "/docs",
+      "destination": "/api/index.py"
     },
     {
-      "src": "/docs",
-      "dest": "/api.py"
-    },
-    {
-      "src": "/openapi.json",
-      "dest": "/api.py"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/frontend/dist/$1"
+      "source": "/openapi.json",
+      "destination": "/api/index.py"
     }
   ]
 }
