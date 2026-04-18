@@ -1,4 +1,6 @@
 {
+  "framework": "vite",
+  "outputDirectory": "dist",
   "rewrites": [
     {
       "source": "/health",
@@ -43,6 +45,10 @@
     {
       "source": "/openapi.json",
       "destination": "/api/index.py"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
