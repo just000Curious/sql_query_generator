@@ -1,0 +1,65 @@
+{
+  "builds": [
+    {
+      "src": "api.py",
+      "use": "@vercel/python"
+    },
+    {
+      "src": "frontend/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/health",
+      "dest": "/api.py"
+    },
+    {
+      "src": "/schemas(.*)",
+      "dest": "/api.py"
+    },
+    {
+      "src": "/categories(.*)",
+      "dest": "/api.py"
+    },
+    {
+      "src": "/query/(.*)",
+      "dest": "/api.py"
+    },
+    {
+      "src": "/search/(.*)",
+      "dest": "/api.py"
+    },
+    {
+      "src": "/stats",
+      "dest": "/api.py"
+    },
+    {
+      "src": "/sessions/(.*)",
+      "dest": "/api.py"
+    },
+    {
+      "src": "/tables(.*)",
+      "dest": "/api.py"
+    },
+    {
+      "src": "/samples",
+      "dest": "/api.py"
+    },
+    {
+      "src": "/docs",
+      "dest": "/api.py"
+    },
+    {
+      "src": "/openapi.json",
+      "dest": "/api.py"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/frontend/dist/$1"
+    }
+  ]
+}
