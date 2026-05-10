@@ -14,6 +14,11 @@ import TempTableOptions from "@/components/TempTableOptions";
 import ValidationPanel from "@/components/ValidationPanel";
 import HelpModal from "@/components/HelpModal";
 import { HistoryPanel } from "@/components/HistoryPanel";
+import ResultsPanel from "@/components/ResultsPanel";
+import HavingBuilder, { type HavingCondition } from "@/components/HavingBuilder";
+import CaseExpressionBuilder, { type CaseExpression, buildCaseSql } from "@/components/CaseExpressionBuilder";
+import FunctionBuilder, { type FunctionColumn, buildFuncSql } from "@/components/FunctionBuilder";
+import WindowFunctionBuilder, { type WindowFunction, buildWindowSql } from "@/components/WindowFunctionBuilder";
 import { api } from "@/lib/api";
 import { addToHistory } from "@/lib/query-history";
 import { toast } from "sonner";
@@ -43,12 +48,29 @@ const Index = () => {
   const [rawSql, setRawSql] = useState("");
   const [distinct, setDistinct] = useState(false);
 
+  // Phase 1+2 new state
+  const [columnAliases, setColumnAliases] = useState<Record<string, string>>({});
+  const [having, setHaving] = useState<HavingCondition[]>([]);
+  const [caseExpressions, setCaseExpressions] = useState<CaseExpression[]>([]);
+  const [functionColumns, setFunctionColumns] = useState<FunctionColumn[]>([]);
+  const [windowFunctions, setWindowFunctions] = useState<WindowFunction[]>([]);
+
   // SQL state
   const [sql, setSql] = useState("");           // raw generated SQL from builder/API
   const [displaySql, setDisplaySql] = useState(""); // possibly wrapped (temp table / CTE)
   const [queryStack, setQueryStack] = useState<{id: string, sql: string, connector: string}[]>([]); // Stacks for UNION
   const [generating, setGenerating] = useState(false);
   const [executing, setExecuting] = useState(false);
+
+  // Execute / Results state
+  const [executeResults, setExecuteResults] = useState<{
+    data: Record<string, unknown>[];
+    columns: string[];
+    rowCount: number;
+    executionTime: number;
+    hasResults: boolean;
+  }>({ data: [], columns: [], rowCount: 0, executionTime: 0, hasResults: false });
+  const [runningQuery, setRunningQuery] = useState(false);
 
   // Init session
   useEffect(() => {
@@ -88,6 +110,12 @@ const Index = () => {
     setDisplaySql("");
     setQueryStack([]);
     setDistinct(false);
+    setColumnAliases({});
+    setHaving([]);
+    setCaseExpressions([]);
+    setFunctionColumns([]);
+    setWindowFunctions([]);
+    setExecuteResults({ data: [], columns: [], rowCount: 0, executionTime: 0, hasResults: false });
     toast.info("All fields cleared");
   };
 
@@ -104,19 +132,30 @@ const Index = () => {
         (a) => `${a.func}(${a.column})${a.alias ? ` AS ${a.alias}` : ""}`
       );
     }
-    // selectedColumns are stored as "alias.column" — use as-is
-    const colList = selectedColumns.length > 0
-      ? selectedColumns.join(", ")
+    // selectedColumns with aliases
+    const colParts = selectedColumns.map((c) => {
+      const alias = columnAliases[c];
+      return alias ? `${c} AS ${alias}` : c;
+    });
+    const colList = colParts.length > 0
+      ? colParts.join(", ")
       : (queryType === "aggregate" ? "" : (selectedTables.length > 1 ? selectedTables.map((t) => `${t.alias}.*`).join(", ") : "*"));
 
-    const selectCols = queryType === "aggregate" && aggParts.length
-      ? (colList ? `${colList}, ${aggParts.join(", ")}` : aggParts.join(", "))
-      : (colList || "*");
+    // Computed columns: CASE, functions, window functions
+    const computedParts: string[] = [];
+    for (const ce of caseExpressions) { const s = buildCaseSql(ce); if (s) computedParts.push(s); }
+    for (const fc of functionColumns) { const s = buildFuncSql(fc); if (s) computedParts.push(s); }
+    for (const wf of windowFunctions) { const s = buildWindowSql(wf); if (s) computedParts.push(s); }
+
+    const allSelectParts = [
+      ...(queryType === "aggregate" && aggParts.length ? (colList ? [colList, ...aggParts] : aggParts) : [colList || "*"]),
+      ...computedParts,
+    ];
 
     const distinctPrefix = distinct ? "DISTINCT " : "";
 
     // ── FROM + JOIN clause ────────────────────────────────────────────────
-    let q = `SELECT ${distinctPrefix}${selectCols}\nFROM ${main.table} ${main.alias}`;
+    let q = `SELECT ${distinctPrefix}${allSelectParts.join(",\n       ")}\nFROM ${main.table} ${main.alias}`;
 
     if (queryType === "join" && joins.length > 0) {
       const joinedAliases = new Set([main.alias]);
@@ -127,7 +166,16 @@ const Index = () => {
           q += `\n${j.joinType} ${toT.table} ${j.toTable}`;
           joinedAliases.add(j.toTable);
         }
-        q += `\n  ON ${j.fromTable}.${j.fromColumn} = ${j.toTable}.${j.toColumn}`;
+        // Multi-ON conditions with operators
+        const conds = j.conditions && j.conditions.length > 0
+          ? j.conditions
+          : [{ id: "", fromColumn: j.fromColumn, operator: "=", toColumn: j.toColumn }];
+        conds.forEach((c, ci) => {
+          if (!c.fromColumn || !c.toColumn) return;
+          const prefix = ci === 0 ? "ON" : "AND";
+          const op = c.operator || "=";
+          q += `\n  ${prefix} ${j.fromTable}.${c.fromColumn} ${op} ${j.toTable}.${c.toColumn}`;
+        });
       }
     } else if (selectedTables.length > 1) {
       for (const extra of selectedTables.slice(1)) {
@@ -136,28 +184,43 @@ const Index = () => {
       }
     }
 
-    // ── WHERE ─────────────────────────────────────────────────────────────
-    const validConds = conditions.filter((c) => c.column);
+    // ── WHERE (with AND/OR logic, EXISTS, ILIKE, grouping) ───────────────────
+    const validConds = conditions.filter((c) => c.column || c.operator === "EXISTS" || c.operator === "NOT EXISTS");
     const dateConditions: string[] = [];
     if (queryType === "date_range" && dateColumn) {
       if (dateFrom) dateConditions.push(`${dateColumn} >= '${dateFrom}'`);
       if (dateTo)   dateConditions.push(`${dateColumn} <= '${dateTo}'`);
     }
-    const allWhere = [
-      ...validConds.map((c, i) => {
+    if (validConds.length > 0 || dateConditions.length > 0) {
+      const whereParts = validConds.map((c, i) => {
         const op = c.operator;
-        const clause = op === "IS NULL" || op === "IS NOT NULL"
-          ? `${c.column} ${op}`
-          : `${c.column} ${op} ${c.value}`;
-        // First condition never gets a logic prefix
-        return i === 0 ? clause : `${c.logic} ${clause}`;
-      }),
-      ...dateConditions,
-    ];
-    if (allWhere.length > 0) q += `\nWHERE ${allWhere.join("\n  ")}`;
+        let clause: string;
+        if (op === "EXISTS" || op === "NOT EXISTS") {
+          clause = `${op} (${c.value})`;
+        } else if (op === "IS NULL" || op === "IS NOT NULL") {
+          clause = `${c.column} ${op}`;
+        } else {
+          clause = `${c.column} ${op} ${c.value}`;
+        }
+        const open = c.groupStart ? "(" : "";
+        const close = c.groupEnd ? ")" : "";
+        const logic = i === 0 ? "" : `${c.logic} `;
+        return `${logic}${open}${clause}${close}`;
+      });
+      const allWhere = [...whereParts, ...dateConditions];
+      if (allWhere.length > 0) q += `\nWHERE ${allWhere.join("\n  ")}`;
+    }
 
-    // ── GROUP BY / ORDER BY ───────────────────────────────────────────────
+    // ── GROUP BY ──────────────────────────────────────────────────────────
     if (groupBy.length > 0) q += `\nGROUP BY ${groupBy.join(", ")}`;
+
+    // ── HAVING ────────────────────────────────────────────────────────────
+    if (having.length > 0) {
+      const havingParts = having.filter(h => h.expression && h.value).map(h => `${h.expression} ${h.operator} ${h.value}`);
+      if (havingParts.length > 0) q += `\nHAVING ${havingParts.join("\n  AND ")}`;
+    }
+
+    // ── ORDER BY ──────────────────────────────────────────────────────────
     if (orderBy.length > 0) {
       const obs = orderBy.filter((o) => o.column).map((o) => `${o.column} ${o.direction}`);
       if (obs.length > 0) q += `\nORDER BY ${obs.join(", ")}`;
@@ -166,7 +229,7 @@ const Index = () => {
     if (offset) q += `\nOFFSET ${offset}`;
 
     return q;
-  }, [queryType, rawSql, selectedTables, selectedColumns, conditions, joins, aggregates, dateColumn, dateFrom, dateTo, groupBy, orderBy, limit, offset, distinct]);
+  }, [queryType, rawSql, selectedTables, selectedColumns, columnAliases, conditions, joins, aggregates, dateColumn, dateFrom, dateTo, groupBy, orderBy, limit, offset, distinct, having, caseExpressions, functionColumns, windowFunctions]);
 
   const handleGenerate = useCallback(async () => {
     if (queryType === "raw") {
@@ -190,34 +253,52 @@ const Index = () => {
       const body = {
         tables: selectedTables.map((st) => ({ table: st.table, schema: st.schema, alias: st.alias })),
 
-        // Columns: stored as "alias.column" → split into {table: alias, column}
+        // Columns with aliases
         columns: selectedColumns.map((col) => {
           const dot = col.indexOf(".");
+          const alias = columnAliases[col] || undefined;
           if (dot !== -1) {
-            return { table: col.slice(0, dot), column: col.slice(dot + 1) };
+            return { table: col.slice(0, dot), column: col.slice(dot + 1), alias };
           }
-          return { table: "", column: col };
+          return { table: "", column: col, alias };
         }),
 
-        // Conditions: c.column may be "alias.column"
-        conditions: conditions
-          .filter((c) => c.column)
-          .map((c) => {
-            const dot = c.column.indexOf(".");
-            if (dot !== -1) {
-              return { table: c.column.slice(0, dot), column: c.column.slice(dot + 1), operator: c.operator, value: c.value };
-            }
-            return { table: "", column: c.column, operator: c.operator, value: c.value };
-          }),
+        // Conditions with logic (AND/OR) + date range conditions
+        conditions: [
+          ...conditions
+            .filter((c) => c.column || c.operator === "EXISTS" || c.operator === "NOT EXISTS")
+            .map((c) => {
+              // EXISTS/NOT EXISTS: no column needed, value is the subquery
+              if (c.operator === "EXISTS" || c.operator === "NOT EXISTS") {
+                return { table: "", column: "", operator: c.operator, value: c.value, logic: c.logic, group_start: c.groupStart ?? false, group_end: c.groupEnd ?? false };
+              }
+              const dot = c.column.indexOf(".");
+              if (dot !== -1) {
+                return { table: c.column.slice(0, dot), column: c.column.slice(dot + 1), operator: c.operator, value: c.value, logic: c.logic, group_start: c.groupStart ?? false, group_end: c.groupEnd ?? false };
+              }
+              return { table: "", column: c.column, operator: c.operator, value: c.value, logic: c.logic, group_start: c.groupStart ?? false, group_end: c.groupEnd ?? false };
+            }),
+          // Inject date range as conditions (Feature 4)
+          ...(queryType === "date_range" && dateColumn ? [
+            ...(dateFrom ? [{ table: dateColumn.split(".")[0] || "", column: dateColumn.split(".").pop() || dateColumn, operator: ">=", value: `'${dateFrom}'`, logic: "AND" as const }] : []),
+            ...(dateTo ? [{ table: dateColumn.split(".")[0] || "", column: dateColumn.split(".").pop() || dateColumn, operator: "<=", value: `'${dateTo}'`, logic: "AND" as const }] : []),
+          ] : []),
+        ],
 
-        // Joins (for JOIN query type)
-        joins: queryType === "join" ? joins.map((j) => ({
-          join_type: j.joinType,
-          from_alias: j.fromTable,
-          from_column: j.fromColumn,
-          to_alias: j.toTable,
-          to_column: j.toColumn,
-        })) : [],
+        // Joins with multi-ON conditions + operators
+        joins: queryType === "join" ? joins.flatMap((j) => {
+          const conds = j.conditions && j.conditions.length > 0
+            ? j.conditions.filter(c => c.fromColumn && c.toColumn)
+            : (j.fromColumn && j.toColumn ? [{ id: "", fromColumn: j.fromColumn, operator: "=", toColumn: j.toColumn }] : []);
+          return conds.map(c => ({
+            join_type: j.joinType,
+            from_alias: j.fromTable,
+            from_column: c.fromColumn,
+            to_alias: j.toTable,
+            to_column: c.toColumn,
+            operator: c.operator || "=",
+          }));
+        }) : [],
 
         // Aggregates
         aggregates: queryType === "aggregate" ? aggregates.map((a) => ({
@@ -225,6 +306,18 @@ const Index = () => {
           column: a.column,
           alias: a.alias || `${a.func.toLowerCase()}_result`,
         })) : [],
+
+        // Computed columns: CASE + functions + window functions
+        computed_columns: [
+          ...caseExpressions.map(ce => buildCaseSql(ce)).filter(Boolean),
+          ...functionColumns.map(fc => buildFuncSql(fc)).filter(Boolean),
+          ...windowFunctions.map(wf => buildWindowSql(wf)).filter(Boolean),
+        ],
+
+        // HAVING
+        having: having.filter(h => h.expression && h.value).map(h => ({
+          table: "", column: h.expression, operator: h.operator, value: h.value,
+        })),
 
         limit: limit || undefined,
         offset: offset || undefined,
@@ -251,7 +344,7 @@ const Index = () => {
     } finally {
       setGenerating(false);
     }
-  }, [queryType, rawSql, selectedTables, selectedColumns, conditions, joins, aggregates, limit, offset, orderBy, groupBy, distinct, buildSqlLocally]);
+  }, [queryType, rawSql, selectedTables, selectedColumns, columnAliases, conditions, joins, aggregates, limit, offset, orderBy, groupBy, distinct, having, caseExpressions, functionColumns, windowFunctions, dateColumn, dateFrom, dateTo, buildSqlLocally]);
 
   const handleValidate = useCallback(async () => {
     const target = displaySql || sql;
@@ -265,6 +358,35 @@ const Index = () => {
       toast.info("✅ SQL generated — copy the query and run it manually on your PostgreSQL server");
     } finally {
       setExecuting(false);
+    }
+  }, [displaySql, sql]);
+
+  const handleExecute = useCallback(async () => {
+    const target = displaySql || sql;
+    if (!target) return;
+    setRunningQuery(true);
+    addToHistory(target);
+    try {
+      const res = await api.executeQuery(target, 1000);
+      if (res.success) {
+        setExecuteResults({
+          data: res.data,
+          columns: res.columns,
+          rowCount: res.row_count,
+          executionTime: res.execution_time,
+          hasResults: true,
+        });
+        toast.success(`✅ Query returned ${res.row_count} row${res.row_count !== 1 ? "s" : ""} in ${res.execution_time.toFixed(3)}s`);
+        // Scroll to results
+        setTimeout(() => document.getElementById("results-panel")?.scrollIntoView({ behavior: "smooth" }), 100);
+      } else {
+        toast.error("Query returned an error — check the SQL syntax");
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(`Execution failed: ${msg}`);
+    } finally {
+      setRunningQuery(false);
     }
   }, [displaySql, sql]);
 
@@ -312,19 +434,30 @@ const Index = () => {
     // 2. JOIN-mode specific validations
     if (queryType === "join") {
       for (const j of joins) {
-        // Incomplete join row
-        if (!j.fromTable || !j.fromColumn || !j.toTable || !j.toColumn) {
-          errors.push(`Incomplete join condition — all 4 fields (left table, left column, right table, right column) are required.`);
+        // Check all ON conditions in the conditions array
+        const conds = j.conditions && j.conditions.length > 0
+          ? j.conditions
+          : [{ id: "", fromColumn: j.fromColumn || "", operator: "=", toColumn: j.toColumn || "" }];
+
+        if (!j.fromTable || !j.toTable) {
+          errors.push(`Incomplete join — select both left and right tables.`);
           continue;
         }
-        // Columns must exist
-        const fromTbl = aliasMap[j.fromTable];
-        const toTbl   = aliasMap[j.toTable];
-        if (fromTbl?.columns.length > 0 && !fromTbl.columns.some((c) => c.name === j.fromColumn)) {
-          errors.push(`JOIN: column "${j.fromColumn}" not found in "${fromTbl.table}".`);
-        }
-        if (toTbl?.columns.length > 0 && !toTbl.columns.some((c) => c.name === j.toColumn)) {
-          errors.push(`JOIN: column "${j.toColumn}" not found in "${toTbl.table}".`);
+
+        for (const cond of conds) {
+          if (!cond.fromColumn || !cond.toColumn) {
+            errors.push(`Incomplete ON condition — select both left and right columns.`);
+            continue;
+          }
+          // Columns must exist
+          const fromTbl = aliasMap[j.fromTable];
+          const toTbl   = aliasMap[j.toTable];
+          if (fromTbl?.columns.length > 0 && !fromTbl.columns.some((c) => c.name === cond.fromColumn)) {
+            errors.push(`JOIN: column "${cond.fromColumn}" not found in "${fromTbl.table}".`);
+          }
+          if (toTbl?.columns.length > 0 && !toTbl.columns.some((c) => c.name === cond.toColumn)) {
+            errors.push(`JOIN: column "${cond.toColumn}" not found in "${toTbl.table}".`);
+          }
         }
       }
 
@@ -441,6 +574,8 @@ const Index = () => {
                       tables={selectedTables}
                       selectedColumns={selectedColumns}
                       onSelectedColumnsChange={setSelectedColumns}
+                      columnAliases={columnAliases}
+                      onColumnAliasesChange={setColumnAliases}
                     />
                   </div>
                 )}
@@ -500,6 +635,75 @@ const Index = () => {
               <AggregateBuilder tables={selectedTables} aggregates={aggregates} onAggregatesChange={setAggregates} />
             </SectionCard>
 
+            {/* Step — HAVING (only when aggregate + group by) */}
+            {queryType === "aggregate" && groupBy.length > 0 && (
+              <SectionCard
+                title="Filter Groups (HAVING)"
+                icon="🎯"
+                stepNum={queryType === "join" ? 6 : 5}
+                hint="Filter aggregated groups — e.g. HAVING COUNT(*) > 5"
+                badge={having.length > 0 ? having.length : undefined}
+              >
+                <HavingBuilder
+                  tables={selectedTables}
+                  aggregates={aggregates.map(a => ({ func: a.func, column: a.column, alias: a.alias }))}
+                  having={having}
+                  onHavingChange={setHaving}
+                />
+              </SectionCard>
+            )}
+
+            {/* Step — CASE/WHEN Expressions */}
+            {selectedTables.length > 0 && (
+              <SectionCard
+                title="CASE/WHEN Expressions"
+                icon="🔀"
+                stepNum={queryType === "join" ? 7 : queryType === "aggregate" ? 6 : 5}
+                hint="Create conditional column values — if/then/else logic"
+                badge={caseExpressions.length > 0 ? caseExpressions.length : undefined}
+              >
+                <CaseExpressionBuilder
+                  tables={selectedTables}
+                  caseExpressions={caseExpressions}
+                  onCaseExpressionsChange={setCaseExpressions}
+                />
+              </SectionCard>
+            )}
+
+            {/* Step — Column Functions */}
+            {selectedTables.length > 0 && (
+              <SectionCard
+                title="Column Functions"
+                icon="ƒ"
+                stepNum={queryType === "join" ? 8 : queryType === "aggregate" ? 7 : 6}
+                hint="UPPER, COALESCE, DATE_TRUNC, ROUND, CAST…"
+                badge={functionColumns.length > 0 ? functionColumns.length : undefined}
+              >
+                <FunctionBuilder
+                  tables={selectedTables}
+                  functionColumns={functionColumns}
+                  onFunctionColumnsChange={setFunctionColumns}
+                />
+              </SectionCard>
+            )}
+
+            {/* Step — Window Functions */}
+            {selectedTables.length > 0 && (
+              <SectionCard
+                title="Window Functions"
+                icon="📈"
+                stepNum={queryType === "join" ? 9 : queryType === "aggregate" ? 8 : 7}
+                hint="ROW_NUMBER, RANK, LAG, running totals…"
+                badge={windowFunctions.length > 0 ? windowFunctions.length : undefined}
+              >
+                <WindowFunctionBuilder
+                  tables={selectedTables}
+                  windowFunctions={windowFunctions}
+                  onWindowFunctionsChange={setWindowFunctions}
+                />
+              </SectionCard>
+            )}
+
             {/* Step — Date Range */}
             <SectionCard
               title="Date Range Filter"
@@ -521,7 +725,7 @@ const Index = () => {
             <SectionCard
               title="Sort, Group & Limit"
               icon="⚙️"
-              stepNum={queryType === "aggregate" ? 5 : queryType === "join" ? 6 : 4}
+              stepNum={queryType === "aggregate" ? 9 : queryType === "join" ? 10 : 8}
               hint="Control order and quantity of results"
             >
               <GroupOrderOptions
@@ -635,14 +839,35 @@ const Index = () => {
             <SectionCard
               title="Generated SQL Query"
               icon="📝"
-              hint="Ready to copy and run on your PostgreSQL server"
+              hint="Ready to run — copy, execute inline, or save as a .sql file"
             >
               <SqlPreview
                 sql={previewSql}
                 onValidate={handleValidate}
                 validating={executing}
+                onExecute={handleExecute}
+                executing={runningQuery}
               />
             </SectionCard>
+
+            {/* Results Panel — shown after Execute */}
+            {executeResults.hasResults && (
+              <SectionCard
+                title="Query Results"
+                icon="📊"
+                hint={`${executeResults.rowCount} rows · ${executeResults.executionTime.toFixed(3)}s`}
+              >
+                <div id="results-panel">
+                  <ResultsPanel
+                    data={executeResults.data}
+                    columns={executeResults.columns}
+                    rowCount={executeResults.rowCount}
+                    executionTime={executeResults.executionTime}
+                    hasResults={executeResults.hasResults}
+                  />
+                </div>
+              </SectionCard>
+            )}
 
             {/* Temp Table / CTE — its own card so it's always visible */}
             <SectionCard

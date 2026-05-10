@@ -40,9 +40,9 @@ const AggregateBuilder = ({ tables, aggregates, onAggregatesChange }: AggregateB
   return (
     <div className="space-y-2">
       {aggregates.map((agg) => (
-        <div key={agg.id} className="flex flex-wrap gap-2 items-center">
+        <div key={agg.id} className="flex flex-wrap gap-3 items-center">
           <Select value={agg.func} onValueChange={(v) => update(agg.id, "func", v)}>
-            <SelectTrigger className="w-28 h-9 text-xs">
+            <SelectTrigger className="w-32 h-10 text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -50,7 +50,7 @@ const AggregateBuilder = ({ tables, aggregates, onAggregatesChange }: AggregateB
             </SelectContent>
           </Select>
           <Select value={agg.column} onValueChange={(v) => update(agg.id, "column", v)}>
-            <SelectTrigger className="flex-1 min-w-[140px] h-9 text-xs">
+            <SelectTrigger className="flex-1 min-w-[160px] h-10 text-sm">
               <SelectValue placeholder="Column" />
             </SelectTrigger>
             <SelectContent>
@@ -61,15 +61,15 @@ const AggregateBuilder = ({ tables, aggregates, onAggregatesChange }: AggregateB
             value={agg.alias}
             onChange={(e) => update(agg.id, "alias", e.target.value)}
             placeholder="Alias (optional)"
-            className="flex-1 min-w-[120px] h-9 text-xs"
+            className="flex-1 min-w-[140px] h-10 text-sm"
           />
-          <Button variant="ghost" size="icon" className="h-9 w-9 text-destructive" onClick={() => remove(agg.id)}>
-            <Trash2 className="h-3.5 w-3.5" />
+          <Button variant="ghost" size="icon" className="h-10 w-10 text-destructive" onClick={() => remove(agg.id)}>
+            <Trash2 className="h-4 w-4" />
           </Button>
         </div>
       ))}
-      <Button variant="outline" size="sm" onClick={add} className="text-xs gap-1.5">
-        <Plus className="h-3.5 w-3.5" /> Add Aggregate
+      <Button variant="outline" size="default" onClick={add} className="text-sm gap-2">
+        <Plus className="h-4 w-4" /> Add Aggregate
       </Button>
     </div>
   );

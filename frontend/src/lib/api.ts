@@ -1,4 +1,12 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+// When the frontend is served by the FastAPI backend (exe or dev server proxy),
+// use a relative base so all fetch() calls go to the same origin automatically.
+// Fall back to an explicit URL only during standalone frontend dev.
+const API_BASE =
+  import.meta.env.VITE_API_BASE_URL ||
+  (typeof window !== "undefined" && window.location.port === "8000"
+    ? ""                          // same-origin: relative URLs work fine
+    : "http://localhost:8000");   // standalone frontend dev (e.g. Vite on :5173)
+
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
@@ -32,13 +40,14 @@ export interface TableColumnsResponse {
 export interface GenerateQueryRequest {
   tables: { table: string; schema: string; alias: string }[];
   columns: { table: string; column: string; alias?: string }[];
-  conditions: { table: string; column: string; operator: string; value: string }[];
+  conditions: { table: string; column: string; operator: string; value: string; logic?: string; group_start?: boolean; group_end?: boolean }[];
   joins?: {
     join_type: string;
     from_alias: string;
     from_column: string;
     to_alias: string;
     to_column: string;
+    operator?: string;
   }[];
   aggregates?: { func: string; column: string; alias: string }[];
   limit?: number;
@@ -47,6 +56,7 @@ export interface GenerateQueryRequest {
   group_by?: string[];
   having?: { table: string; column: string; operator: string; value: string }[];
   distinct?: boolean;
+  computed_columns?: string[];
 }
 
 export interface GenerateQueryResponse {
@@ -76,6 +86,37 @@ export const api = {
 
   getTables: (schema: string) =>
     request<{ tables: string[] } | string[]>(`/tables?schema=${encodeURIComponent(schema)}`),
+
+  getSchemaRelations: (schema: string) =>
+    request<any>(`/schemas/${encodeURIComponent(schema)}/relations`),
+
+  uploadSchema: async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch(`${API_BASE}/api/schema/upload`, {
+      method: "POST",
+      body: formData,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new Error(err.detail || err.error || err.message || "Upload failed");
+    }
+    return res.json();
+  },
+
+  getSchemaBackups: () => 
+    request<{ success: boolean; backups: any[] }>("/api/schema/backups"),
+
+  restoreSchema: (filename: string) =>
+    request<{ success: boolean; message: string; schemas_loaded: number; tables_loaded: number }>("/api/schema/restore", {
+      method: "POST",
+      body: JSON.stringify({ filename }),
+    }),
+
+  deleteSchemaBackup: (filename: string) =>
+    request<{ success: boolean; message: string }>(`/api/schema/backups/${encodeURIComponent(filename)}`, {
+      method: "DELETE",
+    }),
 
   getTableColumns: (table: string, schema: string) =>
     request<TableColumnsResponse>(`/tables/${encodeURIComponent(table)}/columns?schema=${encodeURIComponent(schema)}`),

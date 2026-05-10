@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Copy, CheckCircle, Download, Loader2, ClipboardCheck } from "lucide-react";
+import { Copy, CheckCircle, Download, Loader2, ClipboardCheck, Play } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
 
@@ -7,9 +7,11 @@ interface SqlPreviewProps {
   sql: string;
   onValidate: () => void;
   validating: boolean;
+  onExecute?: () => void;
+  executing?: boolean;
 }
 
-const SqlPreview = ({ sql, onValidate, validating }: SqlPreviewProps) => {
+const SqlPreview = ({ sql, onValidate, validating, onExecute, executing }: SqlPreviewProps) => {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -35,32 +37,19 @@ const SqlPreview = ({ sql, onValidate, validating }: SqlPreviewProps) => {
   const highlightSql = (text: string) => {
     if (!text) return "";
 
-    // Step 1 — mark numbers in plain text BEFORE any HTML is introduced
-    // Using a placeholder to avoid the number regex later matching digits in HTML attributes
     const numPlaceholder = (n: string) => `\x00NUM:${n}\x00`;
     let out = text.replace(/\b(\d+(?:\.\d+)?)\b/g, (_, n) => numPlaceholder(n));
-
-    // Step 2 — HTML-escape the result (placeholders use \x00, not HTML-special chars)
     out = out.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
-    // Step 3 — highlight single-quoted strings
     out = out.replace(/('[^']*')/g, '<span style="color:#a8e6a3">$1</span>');
-
-    // Step 4 — highlight SQL keywords
     out = out.replace(
-      /\b(SELECT|FROM|WHERE|AND|OR|JOIN|LEFT|RIGHT|INNER|OUTER|FULL|CROSS|ON|GROUP BY|ORDER BY|LIMIT|OFFSET|INSERT|UPDATE|DELETE|AS|IN|NOT IN|BETWEEN|LIKE|NOT LIKE|IS NULL|IS NOT NULL|NOT|EXISTS|UNION|ALL|DISTINCT|COUNT|SUM|AVG|MIN|MAX|HAVING|CASE|WHEN|THEN|ELSE|END|ASC|DESC|COALESCE|NULLIF|CAST|INTERSECT|EXCEPT|WITH|TEMPORARY|TEMP|CREATE|DROP|TABLE|VIEW)\b/gi,
+      /\b(SELECT|FROM|WHERE|AND|OR|JOIN|LEFT|RIGHT|INNER|OUTER|FULL|CROSS|ON|GROUP\s+BY|ORDER\s+BY|PARTITION\s+BY|LIMIT|OFFSET|AS|IN|NOT\s+IN|BETWEEN|NOT\s+LIKE|ILIKE|NOT\s+ILIKE|LIKE|IS\s+NULL|IS\s+NOT\s+NULL|NOT|EXISTS|UNION\s+ALL|UNION|INTERSECT|EXCEPT|ALL|DISTINCT|COUNT|SUM|AVG|MIN|MAX|HAVING|CASE|WHEN|THEN|ELSE|END|ASC|DESC|COALESCE|NULLIF|CAST|WITH|TEMP|TEMPORARY|CREATE|DROP|TABLE|VIEW|OVER|ROW_NUMBER|RANK|DENSE_RANK|LAG|LEAD|FIRST_VALUE|LAST_VALUE|NTILE)\b/gi,
       '<span style="color:#7ab4ff;font-weight:bold">$1</span>'
     );
-
-    // Step 5 — highlight schema.table (e.g. PM.pmm_employee)
     out = out.replace(
-      /\b([A-Z]{2,4})\.(\w+)\b/g,
+      /\b([A-Za-z_][A-Za-z0-9_]{0,3})\.(\w+)\b/g,
       '<span style="color:#f8d7a0;font-weight:500">$1</span>.<span style="color:#e0e0e0">$2</span>'
     );
-
-    // Step 6 — restore number placeholders as highlighted spans
     out = out.replace(/\x00NUM:(\d+(?:\.\d+)?)\x00/g, '<span style="color:#ffb86c">$1</span>');
-
     return out;
   };
 
@@ -71,7 +60,6 @@ const SqlPreview = ({ sql, onValidate, validating }: SqlPreviewProps) => {
       {sql ? (
         <div className="sql-editor relative">
           <div className="flex">
-            {/* Line numbers */}
             <div
               className="select-none text-right pr-4 text-sm leading-7"
               style={{ color: "hsl(220,15%,40%)", minWidth: "2.5rem", userSelect: "none" }}
@@ -80,13 +68,11 @@ const SqlPreview = ({ sql, onValidate, validating }: SqlPreviewProps) => {
                 <div key={i}>{i + 1}</div>
               ))}
             </div>
-            {/* SQL content */}
             <pre
               className="flex-1 whitespace-pre-wrap break-words leading-7"
               dangerouslySetInnerHTML={{ __html: highlightSql(sql) }}
             />
           </div>
-          {/* Stats bar */}
           <div className="flex items-center justify-between mt-3 pt-3 border-t text-[11px]" style={{ borderColor: "hsl(220,20%,22%)", color: "hsl(215,15%,55%)" }}>
             <span>{lineCount} lines · {sql.length} characters</span>
             <span className="font-medium" style={{ color: "hsl(145,60%,50%)" }}>✓ Valid PostgreSQL format</span>
@@ -122,6 +108,23 @@ const SqlPreview = ({ sql, onValidate, validating }: SqlPreviewProps) => {
             <><Copy className="h-3.5 w-3.5" /> Copy SQL</>
           )}
         </Button>
+
+        {onExecute && (
+          <Button
+            id="run-preview-btn"
+            size="sm"
+            onClick={onExecute}
+            disabled={!sql || executing}
+            className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-sm"
+            title="Run query against the connected database and preview results inline"
+          >
+            {executing
+              ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Running…</>
+              : <><Play className="h-3.5 w-3.5" /> Run &amp; Preview Results</>
+            }
+          </Button>
+        )}
+
         <Button
           variant="outline"
           size="sm"
@@ -136,6 +139,7 @@ const SqlPreview = ({ sql, onValidate, validating }: SqlPreviewProps) => {
           }
           {validating ? "Validating…" : "Validate SQL"}
         </Button>
+
         <Button
           variant="outline"
           size="sm"
@@ -150,7 +154,12 @@ const SqlPreview = ({ sql, onValidate, validating }: SqlPreviewProps) => {
       {sql && (
         <p className="text-xs text-muted-foreground flex items-center gap-1.5 bg-muted/50 px-3 py-2 rounded-lg border border-border/60">
           <span>💡</span>
-          <span>Click <strong>Copy SQL</strong>, then paste and run it in your PostgreSQL client (pgAdmin, DBeaver, psql, etc.)</span>
+          <span>
+            {onExecute
+              ? <>Click <strong>Run &amp; Preview Results</strong> to execute against the database inline, or <strong>Copy SQL</strong> for your PostgreSQL client.</>
+              : <>Click <strong>Copy SQL</strong>, then paste and run it in your PostgreSQL client (pgAdmin, DBeaver, psql, etc.)</>
+            }
+          </span>
         </p>
       )}
     </div>

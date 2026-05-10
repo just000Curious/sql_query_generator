@@ -11,24 +11,74 @@ import time
 import traceback
 import uuid
 import warnings
+import webbrowser
+import threading
 from contextlib import asynccontextmanager
 from datetime import datetime, date
 from typing import Optional, List, Dict, Any, Union
 import logging
+import shutil
 
 # Suppress Pydantic warning for "schema" field shadowing
 warnings.filterwarnings("ignore", message='Field name "schema" .* shadows an attribute .*')
 
+# ============================================================
+# PYINSTALLER RESOURCE PATH HELPER
+# ============================================================
+
+def get_resource_path(relative_path: str) -> str:
+    """
+    Return the absolute path to a bundled resource.
+    Priority:
+      1. sys._MEIPASS  (set by PyInstaller --onefile at runtime)
+      2. Directory of this script  (normal development run)
+    """
+    if hasattr(sys, '_MEIPASS'):
+        base = sys._MEIPASS
+    else:
+        base = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base, relative_path)
+
+# Resolve the frontend dist directory ONCE at import time so every route
+# sees the same path and we can log it for debugging.
+DIST_DIR  = get_resource_path(os.path.join("frontend", "dist"))
+INDEX_HTML = os.path.join(DIST_DIR, "index.html")
+
 # Add current directory to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# ============================================================
+# LOGGING — write to file so crashes are visible even with --noconsole
+# ============================================================
+
+_LOG_DIR = os.path.join(os.path.expanduser("~"), "SQL_Query_Generator_logs")
+os.makedirs(_LOG_DIR, exist_ok=True)
+_LOG_FILE = os.path.join(_LOG_DIR, "app.log")
+
+# --noconsole (PyInstaller) sets sys.stdout / sys.stderr to None.
+# Redirect them to the log file BEFORE anything (uvicorn, logging) touches them.
+# This prevents "NoneType has no attribute isatty" from uvicorn's log formatter.
+_IS_FROZEN_NOCONSOLE = getattr(sys, 'frozen', False) and sys.stdout is None
+if _IS_FROZEN_NOCONSOLE:
+    _log_stream = open(_LOG_FILE, 'a', encoding='utf-8', buffering=1)
+    sys.stdout = _log_stream
+    sys.stderr = _log_stream
+
+# Build the handler list — only add StreamHandler when stdout is a real stream
+_log_handlers: list = [logging.FileHandler(_LOG_FILE, encoding="utf-8")]
+if sys.stdout is not None:
+    _log_handlers.append(logging.StreamHandler(sys.stdout))
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=_log_handlers,
+)
 logger = logging.getLogger(__name__)
 
 # Try to import FastAPI
 try:
-    from fastapi import FastAPI, HTTPException, Query
+    from fastapi import FastAPI, HTTPException, Query, UploadFile, File
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.responses import JSONResponse
     from pydantic import BaseModel, Field, field_validator
@@ -83,9 +133,12 @@ class ColumnInput(BaseModel):
 
 class ConditionInput(BaseModel):
     table: str = ""
-    column: str
+    column: str = ""
     operator: str = "="
     value: Optional[Any] = None
+    logic: str = "AND"  # AND or OR — used between conditions
+    group_start: bool = False  # opens parenthesis before this condition
+    group_end: bool = False    # closes parenthesis after this condition
 
 class OrderByInput(BaseModel):
     column: str
@@ -97,6 +150,7 @@ class JoinInput(BaseModel):
     from_column: str
     to_alias: str
     to_column: str
+    operator: str = "="  # Support non-equi joins (=, !=, <, <=, >, >=, BETWEEN)
 
 class GenerateRequest(BaseModel):
     tables: List[TableInput]
@@ -110,6 +164,7 @@ class GenerateRequest(BaseModel):
     aggregates: Optional[List[Dict[str, str]]] = []
     having: Optional[List[ConditionInput]] = []
     distinct: Optional[bool] = False
+    computed_columns: Optional[List[str]] = []  # Raw SQL expressions: CASE, functions, window funcs
 
 class UnionQueryRequest(BaseModel):
     queries: List[GenerateRequest]
@@ -681,7 +736,8 @@ class SchemaDatabaseManager:
 # ============================================================
 
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-JSON_PATH = os.path.join(_BASE_DIR, "db_files", "metadata.json")
+# Use get_resource_path so the bundled .exe can locate metadata.json
+JSON_PATH = get_resource_path(os.path.join("db_files", "metadata.json"))
 db_manager = SchemaDatabaseManager(json_file_path=JSON_PATH)
 
 
@@ -692,34 +748,40 @@ db_manager = SchemaDatabaseManager(json_file_path=JSON_PATH)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown logic"""
-    # ── Startup ──
+    # Startup
     print("=" * 60)
-    print("🚀 Starting SQL Query Generator API v5.0")
+    print("Starting SQL Query Generator API v5.0")
     print("=" * 60)
 
-    print("📂 Loading schema from JSON...")
+    print("Loading schema from JSON...")
     db_manager.load_schema_from_json()
 
     if db_manager.schema_data:
-        print(f"✅ Loaded {len(db_manager.schemas)} schemas with {db_manager.total_tables} tables")
+        print("Loaded %d schemas with %d tables" % (len(db_manager.schemas), db_manager.total_tables))
         for schema_name, tables in db_manager.schemas.items():
-            print(f"   - {schema_name}: {len(tables)} tables")
+            print("   - %s: %d tables" % (schema_name, len(tables)))
 
-    print("🗄️ Creating database tables...")
+    print("Creating database tables...")
     db_manager.init_database()
 
-    print(f"\n✅ Database initialized")
-    print(f"✅ Tables created: {db_manager.tables_created}")
-    print(f"✅ Server ready at http://127.0.0.1:8000")
-    print(f"✅ API docs at http://127.0.0.1:8000/docs")
+    print("Database initialized")
+    print("Tables created: %d" % db_manager.tables_created)
+    print("Server ready at http://127.0.0.1:8000")
+    print("Log file: %s" % _LOG_FILE)
+    # Diagnostic: confirm the frontend path that will be served
+    print("Frontend dist dir : %s" % DIST_DIR)
+    print("index.html exists : %s" % os.path.isfile(INDEX_HTML))
     print("=" * 60)
+
+    # Auto-open browser after a short delay so the server is fully up
+    threading.Timer(1.5, lambda: webbrowser.open("http://127.0.0.1:8000")).start()
 
     yield  # App runs here
 
-    # ── Shutdown ──
+    # Shutdown
     if db_manager.connection:
         db_manager.connection.close()
-    print("🛑 Server stopped")
+    print("Server stopped")
 
 
 # ============================================================
@@ -786,6 +848,11 @@ def _build_sql_from_request(request: GenerateRequest) -> str:
             ref += f" AS {c.alias}"
         select_parts.append(ref)
 
+    # Computed columns: CASE expressions, scalar functions, window functions
+    for expr in (request.computed_columns or []):
+        if expr and expr.strip():
+            select_parts.append(expr.strip())
+
     if not select_parts:
         if len(request.tables) > 1:
             select_parts = [f"{t.alias}.*" for t in request.tables]
@@ -806,37 +873,58 @@ def _build_sql_from_request(request: GenerateRequest) -> str:
             if j.to_alias not in joined_aliases:
                 sql += f"\n{j.join_type} {to_tbl.table} {j.to_alias}"
                 joined_aliases.add(j.to_alias)
-            sql += f"\n  ON {j.from_alias}.{j.from_column} = {j.to_alias}.{j.to_column}"
+            op = getattr(j, 'operator', '=') or '='
+            sql += f"\n  ON {j.from_alias}.{j.from_column} {op} {j.to_alias}.{j.to_column}"
     else:
         for extra in request.tables[1:]:
             sql += f"\n-- WARNING: no JOIN condition defined for {extra.table}"
             sql += f"\nCROSS JOIN {extra.table} {extra.alias}"
 
-    # ── WHERE clause
-    where_parts: List[str] = []
-    for cond in (request.conditions or []):
-        if not cond.column:
-            continue
-        ref = col_ref(cond.table, cond.column)
+    # ── WHERE clause (supports AND / OR logic, EXISTS, ILIKE, and parenthesis groups)
+    where_items: List[dict] = []
+    for i, cond in enumerate(request.conditions or []):
         op = (cond.operator or "=").upper().strip()
+        # EXISTS/NOT EXISTS don't need a column reference
+        is_exists = op in ("EXISTS", "NOT EXISTS")
+        if not cond.column and not is_exists:
+            continue
+        ref = col_ref(cond.table, cond.column) if not is_exists else ""
 
         if op in ("IS NULL", "IS NOT NULL"):
-            where_parts.append(f"{ref} {op}")
+            clause = f"{ref} {op}"
+        elif op == "EXISTS":
+            clause = f"EXISTS ({cond.value})"
+        elif op == "NOT EXISTS":
+            clause = f"NOT EXISTS ({cond.value})"
         elif op in ("IN", "NOT IN"):
             val = helper._format_value(cond.value)
-            where_parts.append(f"{ref} {op} ({val})")
+            clause = f"{ref} {op} ({val})"
         elif op == "BETWEEN":
             val = helper._format_value(cond.value)
-            where_parts.append(f"{ref} BETWEEN {val}")
-        elif op == "LIKE":
+            clause = f"{ref} BETWEEN {val}"
+        elif op in ("LIKE", "NOT LIKE", "ILIKE", "NOT ILIKE"):
             val = helper._format_value(cond.value)
-            where_parts.append(f"{ref} LIKE {val}")
+            clause = f"{ref} {op} {val}"
         else:
             val = helper._format_value(cond.value)
-            where_parts.append(f"{ref} {op} {val}")
+            clause = f"{ref} {op} {val}"
 
-    if where_parts:
-        sql += "\nWHERE " + "\n  AND ".join(where_parts)
+        logic = (getattr(cond, 'logic', 'AND') or 'AND').upper()
+        where_items.append({
+            "sql": clause,
+            "logic": logic,
+            "group_start": getattr(cond, 'group_start', False),
+            "group_end": getattr(cond, 'group_end', False),
+        })
+
+    if where_items:
+        where_str = ""
+        for idx, item in enumerate(where_items):
+            prefix = "" if idx == 0 else f"\n  {item['logic']} "
+            open_p = "(" if item.get("group_start") else ""
+            close_p = ")" if item.get("group_end") else ""
+            where_str += f"{prefix}{open_p}{item['sql']}{close_p}"
+        sql += "\nWHERE " + where_str
 
     # ── GROUP BY
     if request.group_by:
@@ -892,26 +980,21 @@ def _build_sql_from_request(request: GenerateRequest) -> str:
 
 @app.get("/")
 async def root():
-    """Root endpoint with schema list"""
+    """Serve the React frontend at the root, or return API info when no frontend is bundled."""
+    if os.path.isfile(INDEX_HTML):
+        from fastapi.responses import FileResponse
+        return FileResponse(INDEX_HTML)
+    # Fallback: API info (development / API-only mode)
+    logger.warning("index.html not found at: %s", INDEX_HTML)
     return {
         "name": "SQL Query Generator API",
         "version": "5.0.0",
         "status": "running",
+        "frontend": "not bundled",
+        "index_html_checked": INDEX_HTML,
         "schemas": [s['name'] for s in db_manager.get_schemas()],
         "total_schemas": len(db_manager.get_schemas()),
         "total_tables": db_manager.total_tables,
-        "endpoints": {
-            "docs": "/docs",
-            "health": "/health",
-            "schemas": "/schemas",
-            "categories": "/categories",
-            "tables": "/schemas/{schema}/tables",
-            "table_info": "/schemas/{schema}/tables/{table}",
-            "generate": "/query/generate",
-            "union": "/query/union",
-            "execute": "/query/execute",
-            "search": "/search"
-        }
     }
 
 
@@ -996,6 +1079,161 @@ async def get_table_info(schema_name: str, table_name: str):
     except HTTPException:
         raise
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/schema/upload")
+async def upload_schema(file: UploadFile = File(...)):
+    """Upload a new metadata.json file, create backups, and hot-reload the database"""
+    try:
+        content = await file.read()
+        
+        # Validate it is proper JSON
+        try:
+            schema_data = json.loads(content)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid JSON file format")
+
+        # Basic validation to ensure it looks like a schema structure
+        if not isinstance(schema_data, dict):
+            raise HTTPException(status_code=400, detail="Schema JSON must be a dictionary at its root")
+
+        # Define file paths
+        target_path = db_manager.json_file_path or get_resource_path("metadata.json")
+        
+        # Backup rotation logic (keep up to 3 backups)
+        if os.path.exists(target_path):
+            dir_name = os.path.dirname(target_path)
+            base_name = os.path.basename(target_path)
+            name_part, ext_part = os.path.splitext(base_name)
+            
+            # Rotate backups (3 -> delete, 2 -> 3, 1 -> 2, current -> 1)
+            backup_3 = os.path.join(dir_name, f"{name_part}_backup_3{ext_part}")
+            backup_2 = os.path.join(dir_name, f"{name_part}_backup_2{ext_part}")
+            backup_1 = os.path.join(dir_name, f"{name_part}_backup_1{ext_part}")
+            
+            if os.path.exists(backup_3):
+                os.remove(backup_3)
+            if os.path.exists(backup_2):
+                os.rename(backup_2, backup_3)
+            if os.path.exists(backup_1):
+                os.rename(backup_1, backup_2)
+                
+            # Create backup 1
+            shutil.copy2(target_path, backup_1)
+            logger.info(f"Created schema backup at {backup_1}")
+
+        # Write the new file
+        with open(target_path, "wb") as f:
+            f.write(content)
+            
+        logger.info(f"Successfully saved new schema to {target_path}")
+
+        # Hot-reload the database
+        db_manager.load_schema_from_json(target_path)
+        db_manager.init_database()
+        
+        return {
+            "success": True,
+            "message": "Schema updated and loaded successfully",
+            "schemas_loaded": len(db_manager.schemas),
+            "tables_loaded": db_manager.total_tables
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error uploading schema: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to process schema upload: {str(e)}")
+
+
+@app.get("/api/schema/backups")
+async def list_schema_backups():
+    """List all available schema backup files"""
+    try:
+        target_path = db_manager.json_file_path or get_resource_path("metadata.json")
+        dir_name = os.path.dirname(target_path)
+        base_name = os.path.basename(target_path)
+        name_part, ext_part = os.path.splitext(base_name)
+        
+        backups = []
+        for i in range(1, 4):
+            backup_file = f"{name_part}_backup_{i}{ext_part}"
+            backup_path = os.path.join(dir_name, backup_file)
+            if os.path.exists(backup_path):
+                stat = os.stat(backup_path)
+                backups.append({
+                    "filename": backup_file,
+                    "size": stat.st_size,
+                    "last_modified": datetime.fromtimestamp(stat.st_mtime).isoformat()
+                })
+                
+        return {"success": True, "backups": backups}
+    except Exception as e:
+        logger.error(f"Error listing backups: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class RestoreRequest(BaseModel):
+    filename: str
+
+@app.post("/api/schema/restore")
+async def restore_schema_backup(request: RestoreRequest):
+    """Restore a specific schema backup"""
+    try:
+        target_path = db_manager.json_file_path or get_resource_path("metadata.json")
+        dir_name = os.path.dirname(target_path)
+        backup_path = os.path.join(dir_name, request.filename)
+        
+        if not os.path.exists(backup_path):
+            raise HTTPException(status_code=404, detail="Backup file not found")
+            
+        # Optional: Save current to backup before restoring
+        # We'll skip complex rotation here and just overwrite, or we could rotate.
+        # Let's just do a simple copy for the restore.
+        shutil.copy2(backup_path, target_path)
+        logger.info(f"Restored schema from {backup_path}")
+        
+        # Hot-reload
+        db_manager.load_schema_from_json(target_path)
+        db_manager.init_database()
+        
+        return {
+            "success": True,
+            "message": f"Successfully restored {request.filename}",
+            "schemas_loaded": len(db_manager.schemas),
+            "tables_loaded": db_manager.total_tables
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error restoring backup: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/schema/backups/{filename}")
+async def delete_schema_backup(filename: str):
+    """Delete a specific schema backup"""
+    try:
+        target_path = db_manager.json_file_path or get_resource_path("metadata.json")
+        dir_name = os.path.dirname(target_path)
+        backup_path = os.path.join(dir_name, filename)
+        
+        if not os.path.exists(backup_path):
+            raise HTTPException(status_code=404, detail="Backup file not found")
+            
+        # Ensure it's actually a backup file being deleted, not something else
+        if not filename.startswith("metadata_backup_"):
+            raise HTTPException(status_code=403, detail="Can only delete backup files")
+            
+        os.remove(backup_path)
+        logger.info(f"Deleted backup {backup_path}")
+        
+        return {"success": True, "message": f"Deleted {filename}"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting backup: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -1255,6 +1493,39 @@ async def get_sample_queries():
 
 
 # ============================================================
+# STATIC FILE SERVING - React frontend (production / .exe mode)
+# ============================================================
+
+try:
+    from fastapi.staticfiles import StaticFiles
+    from fastapi.responses import FileResponse
+
+    if os.path.isdir(DIST_DIR):
+        _assets_dir = os.path.join(DIST_DIR, "assets")
+        if os.path.isdir(_assets_dir):
+            app.mount("/assets", StaticFiles(directory=_assets_dir), name="assets")
+
+        # SPA catch-all: every non-API path returns index.html so
+        # client-side routing (React Router) works on page refresh.
+        @app.get("/{full_path:path}", include_in_schema=False)
+        async def spa_catch_all(full_path: str):
+            # Check if it's a real file in dist/ (e.g., /krc-logo.png, /favicon.ico)
+            file_path = os.path.join(DIST_DIR, full_path)
+            if os.path.isfile(file_path):
+                return FileResponse(file_path)
+                
+            if os.path.isfile(INDEX_HTML):
+                return FileResponse(INDEX_HTML)
+            return JSONResponse(status_code=404, content={"error": "Frontend build not found"})
+
+        logger.info("Serving React frontend from: %s", DIST_DIR)
+    else:
+        logger.warning("frontend/dist not found at %s - UI will not be served", DIST_DIR)
+except Exception as _static_err:
+    logger.error("Could not mount static files: %s", _static_err)
+
+
+# ============================================================
 # ERROR HANDLERS
 # ============================================================
 
@@ -1280,8 +1551,9 @@ async def general_exception_handler(request, exc):
     )
 
 if __name__ == "__main__":
+    # When sys.stdout was None we already redirected it above, so print() is safe.
     print("=" * 60)
-    print("🚀 SQL Query Generator API v5.0 (Schema-Based)")
+    print("SQL Query Generator API v5.0 (Schema-Based)")
     print("=" * 60)
     print()
 
@@ -1289,6 +1561,10 @@ if __name__ == "__main__":
         app,
         host="127.0.0.1",
         port=8000,
-        reload=True,
-        log_level="info"
+        reload=False,     # Must be False inside a PyInstaller bundle
+        log_level="info",
+        # Disable uvicorn's own log config when running headless (--noconsole).
+        # Its DefaultFormatter calls sys.stdout.isatty() which crashes when
+        # stdout was None at import time (before our redirect above fixed it).
+        log_config=None if _IS_FROZEN_NOCONSOLE else None,
     )

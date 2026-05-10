@@ -59,7 +59,7 @@ const GroupOrderOptions = ({
             {availableColumns.map((c) => {
               const colName = c.includes(".") ? c.split(".").pop()! : c;
               return (
-                <label key={c} className="flex items-center gap-1.5 text-xs bg-muted px-2.5 py-1 rounded-md cursor-pointer hover:bg-muted/80">
+                <label key={c} className="flex items-center gap-2 text-sm bg-muted px-3 py-1.5 rounded-lg cursor-pointer hover:bg-muted/80">
                   <Checkbox checked={groupBy.includes(c)} onCheckedChange={() => toggleGroupBy(c)} />
                   {colName}
                 </label>
@@ -74,9 +74,9 @@ const GroupOrderOptions = ({
         <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Order By</Label>
         <div className="space-y-2 mt-2">
           {orderBy.map((o, i) => (
-            <div key={i} className="flex gap-2 items-center">
+            <div key={i} className="flex gap-3 items-center">
               <Select value={o.column} onValueChange={(v) => updateOrderBy(i, "column", v)}>
-                <SelectTrigger className="flex-1 h-8 text-xs">
+                <SelectTrigger className="flex-1 h-10 text-sm">
                   <SelectValue placeholder="Column" />
                 </SelectTrigger>
                 <SelectContent>
@@ -87,7 +87,7 @@ const GroupOrderOptions = ({
                 </SelectContent>
               </Select>
               <Select value={o.direction} onValueChange={(v) => updateOrderBy(i, "direction", v)}>
-                <SelectTrigger className="w-24 h-8 text-xs">
+                <SelectTrigger className="w-28 h-10 text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -95,13 +95,13 @@ const GroupOrderOptions = ({
                   <SelectItem value="DESC">DESC ↓</SelectItem>
                 </SelectContent>
               </Select>
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => removeOrderBy(i)}>
-                <Trash2 className="h-3 w-3" />
+              <Button variant="ghost" size="icon" className="h-10 w-10 text-destructive" onClick={() => removeOrderBy(i)}>
+                <Trash2 className="h-4 w-4" />
               </Button>
             </div>
           ))}
-          <Button variant="outline" size="sm" onClick={addOrderBy} className="text-xs gap-1.5 h-7">
-            <Plus className="h-3 w-3" /> Add Sort
+          <Button variant="outline" size="default" onClick={addOrderBy} className="text-sm gap-2">
+            <Plus className="h-4 w-4" /> Add Sort
           </Button>
         </div>
       </div>
@@ -111,11 +111,11 @@ const GroupOrderOptions = ({
         <div className="grid grid-cols-2 gap-4">
           <div>
             <Label className="text-xs text-muted-foreground">Limit</Label>
-            <Input type="number" min={0} max={10000} value={limit} onChange={(e) => onLimitChange(Number(e.target.value))} className="h-9 mt-1" />
+            <Input type="number" min={0} max={10000} value={limit} onChange={(e) => onLimitChange(Number(e.target.value))} className="h-10 mt-1" />
           </div>
           <div>
             <Label className="text-xs text-muted-foreground">Offset</Label>
-            <Input type="number" min={0} value={offset} onChange={(e) => onOffsetChange(Number(e.target.value))} className="h-9 mt-1" />
+            <Input type="number" min={0} value={offset} onChange={(e) => onOffsetChange(Number(e.target.value))} className="h-10 mt-1" />
           </div>
         </div>
       </div>

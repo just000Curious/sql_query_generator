@@ -4,28 +4,44 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ═══════════════════════════════════════════════════════════════
+   KONKAN RAILWAY CORPORATION — Official Brand Design System
+   ─────────────────────────────────────────────────────────────
+   KRC Navy Blue  : #003087  hsl(216 100% 27%)
+   KRC Red        : #CC2229  hsl(357 71% 46%)
+   KRC Light Blue : #0066CC  hsl(210 100% 40%)
+   KRC Gold       : #F5A623  hsl(37 90% 55%)
+   ─────────────────────────────────────────────────────────────
+   Light mode: white body, navy header, red accents
+   Dark mode : deep navy body, slightly lighter navy cards
+═══════════════════════════════════════════════════════════════ */
+
 @layer base {
   :root {
-    --background: 220 25% 96%;
-    --foreground: 215 30% 18%;
+    /* ── Light Mode (KRC official: white + navy + red) ── */
+    --background: 210 20% 97%;
+    --foreground: 216 80% 15%;
 
     --card: 0 0% 100%;
-    --card-foreground: 215 30% 18%;
+    --card-foreground: 216 80% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 215 30% 18%;
+    --popover-foreground: 216 80% 15%;
 
-    --primary: 220 85% 20%;
+    /* KRC Navy Blue as primary */
+    --primary: 216 100% 27%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 75% 52%;
+    /* KRC Red as secondary */
+    --secondary: 357 71% 46%;
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 218 25% 92%;
-    --muted-foreground: 215 18% 48%;
+    --muted: 214 20% 93%;
+    --muted-foreground: 216 25% 45%;
 
-    --accent: 38 95% 52%;
-    --accent-foreground: 220 85% 14%;
+    /* KRC Red as accent */
+    --accent: 357 71% 46%;
+    --accent-foreground: 0 0% 100%;
 
     --destructive: 4 74% 54%;
     --destructive-foreground: 0 0% 100%;
@@ -33,40 +49,41 @@
     --success: 148 68% 38%;
     --success-foreground: 0 0% 100%;
 
-    --warning: 37 92% 50%;
-    --warning-foreground: 220 85% 14%;
+    --warning: 37 90% 55%;
+    --warning-foreground: 216 80% 10%;
 
-    --border: 215 20% 86%;
-    --input: 215 20% 86%;
-    --ring: 210 75% 52%;
+    --border: 214 20% 86%;
+    --input: 214 20% 86%;
+    --ring: 216 100% 27%;
 
-    --radius: 0.625rem;
-
+    --radius: 0.75rem;
     --font-sans: 'Inter', system-ui, sans-serif;
     --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
   }
 
-  /* ── Dark Mode ── */
+  /* ── Dark Mode (deep KRC navy) ── */
   .dark {
-    --background: 220 25% 8%;
-    --foreground: 210 25% 90%;
+    --background: 216 80% 8%;
+    --foreground: 210 30% 92%;
 
-    --card: 220 22% 12%;
-    --card-foreground: 210 25% 90%;
+    --card: 216 70% 12%;
+    --card-foreground: 210 30% 92%;
 
-    --popover: 220 22% 12%;
-    --popover-foreground: 210 25% 90%;
+    --popover: 216 70% 12%;
+    --popover-foreground: 210 30% 92%;
 
-    --primary: 210 75% 55%;
+    /* KRC Navy lighter for dark mode readability */
+    --primary: 216 80% 55%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 75% 52%;
+    /* KRC Red stays vivid */
+    --secondary: 357 71% 55%;
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 220 18% 18%;
-    --muted-foreground: 215 15% 60%;
+    --muted: 216 55% 16%;
+    --muted-foreground: 216 20% 58%;
 
-    --accent: 38 95% 52%;
+    --accent: 357 71% 55%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 4 74% 54%;
@@ -75,143 +92,192 @@
     --success: 148 68% 42%;
     --success-foreground: 0 0% 100%;
 
-    --warning: 37 92% 50%;
+    --warning: 37 90% 55%;
     --warning-foreground: 0 0% 100%;
 
-    --border: 220 18% 22%;
-    --input: 220 18% 22%;
-    --ring: 210 75% 52%;
+    --border: 216 45% 20%;
+    --input: 216 45% 20%;
+    --ring: 216 80% 55%;
   }
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
+  * { @apply border-border; }
 
   body {
     @apply bg-background text-foreground antialiased;
     font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.65;
   }
 
-  code, pre {
-    font-family: var(--font-mono);
-  }
+  code, pre { font-family: var(--font-mono); }
 
-  ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-  ::-webkit-scrollbar-track {
-    @apply bg-muted rounded-full;
-  }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { @apply bg-muted rounded-full; }
   ::-webkit-scrollbar-thumb {
-    @apply bg-border rounded-full;
+    background: hsl(216 100% 27% / 0.4);
+    border-radius: 9999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-muted-foreground/40;
+    background: hsl(216 100% 27% / 0.7);
   }
 }
 
 @layer components {
+
+  /* ── Card container ── */
   .railway-card {
-    @apply bg-card rounded-xl shadow-sm border border-border/80 p-5 transition-all duration-200 hover:shadow-md;
+    @apply bg-card rounded-2xl border border-border/70 p-6 transition-all duration-200;
+    box-shadow: 0 1px 6px hsl(216 80% 8% / 0.12);
+    position: relative;
+    overflow: hidden;
   }
-
-  .section-header {
-    @apply flex items-center justify-between mb-4;
+  .railway-card:hover {
+    box-shadow: 0 3px 14px hsl(216 80% 8% / 0.18);
   }
+  /* KRC Navy top accent line on hover */
+  .railway-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, hsl(216 100% 27%), hsl(357 71% 46% / 0.5));
+    opacity: 0;
+    transition: opacity 0.25s;
+  }
+  .railway-card:hover::before { opacity: 1; }
 
+  .section-header { @apply flex items-center justify-between mb-5; }
+
+  /* Section titles — KRC Navy Blue */
   .section-title {
-    @apply text-sm font-bold text-primary flex items-center gap-2 uppercase tracking-widest;
+    @apply text-sm font-bold flex items-center gap-2.5 uppercase tracking-widest;
+    color: hsl(216 100% 27%);
+  }
+  .dark .section-title {
+    color: hsl(216 80% 68%);
   }
 
+  /* ── SQL editor ── */
   .sql-editor {
-    @apply bg-[hsl(220,25%,12%)] text-[hsl(210,35%,88%)] rounded-xl p-5 font-mono text-sm leading-7 overflow-auto;
-    border: 1px solid hsl(220,25%,22%);
-    box-shadow: inset 0 2px 8px rgba(0,0,0,0.25);
+    @apply rounded-2xl p-6 font-mono text-sm leading-7 overflow-auto;
+    background: hsl(216 80% 7%);
+    color: hsl(210 35% 88%);
+    border: 1px solid hsl(216 45% 18%);
+    box-shadow: inset 0 2px 8px rgba(0,0,0,0.3);
   }
 
+  /* ── Badges ── */
   .badge-key {
-    @apply inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-accent/20 text-amber-700;
+    @apply inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md;
+    background: hsl(37 90% 55% / 0.18);
+    color: hsl(37 90% 40%);
   }
-
   .badge-fk {
-    @apply inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-secondary/15 text-secondary;
+    @apply inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md;
+    background: hsl(216 100% 27% / 0.12);
+    color: hsl(216 100% 35%);
   }
-
-  /* ── Single definition for count badge ── */
   .badge-count {
-    @apply inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold bg-secondary/20 text-secondary;
+    @apply inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-full text-[11px] font-bold;
+    background: hsl(216 100% 27% / 0.15);
+    color: hsl(216 100% 30%);
+  }
+  .dark .badge-count {
+    background: hsl(216 80% 55% / 0.2);
+    color: hsl(216 80% 70%);
   }
 
+  /* ── Step indicators — KRC Navy ── */
   .step-indicator {
-    @apply flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-primary text-primary-foreground flex-shrink-0;
+    @apply flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold flex-shrink-0 text-white;
+    background: hsl(216 100% 27%);
   }
-
+  .dark .step-indicator {
+    background: hsl(216 80% 48%);
+  }
   .step-indicator-done {
-    @apply flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-success text-success-foreground flex-shrink-0;
+    @apply flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold flex-shrink-0 bg-success text-success-foreground;
   }
 
-  /* ── Single definition for column chips ── */
+  /* ── Column chips ── */
   .col-chip {
-    @apply flex items-center gap-1.5 px-2 py-1 rounded-lg border cursor-pointer text-xs transition-colors duration-100 select-none;
+    @apply flex items-center gap-2 px-3 py-1.5 rounded-lg border cursor-pointer text-sm transition-all duration-100 select-none;
   }
   .col-chip-selected {
-    @apply border-primary/50 bg-primary/10 text-primary font-medium;
+    border-color: hsl(216 100% 27% / 0.5);
+    background: hsl(216 100% 27% / 0.1);
+    color: hsl(216 100% 27%);
+    @apply font-medium;
+  }
+  .dark .col-chip-selected {
+    border-color: hsl(216 80% 55% / 0.5);
+    background: hsl(216 80% 55% / 0.12);
+    color: hsl(216 80% 70%);
   }
   .col-chip-unselected {
     @apply border-border bg-muted/30 text-muted-foreground hover:bg-muted/60;
   }
+  .col-chip-unselected:hover {
+    border-color: hsl(216 100% 27% / 0.35);
+  }
 
+  /* ── Query type buttons — KRC Navy active, Red hover hint ── */
   .query-type-btn {
-    @apply flex flex-col items-center gap-1.5 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-150 border-2 cursor-pointer;
+    @apply flex flex-col items-center gap-2 px-5 py-4 rounded-2xl text-sm font-medium transition-all duration-150 border-2 cursor-pointer;
+    min-width: 130px;
   }
-
   .query-type-btn-active {
-    @apply bg-primary text-primary-foreground border-primary shadow-md;
-    transform: translateY(-1px);
-  }
-
-  .query-type-btn-inactive {
-    @apply bg-card text-foreground border-border hover:border-secondary/60 hover:bg-muted/60;
-  }
-
-  .condition-row {
-    @apply flex flex-wrap gap-2 items-center p-3 rounded-xl bg-muted/50 border border-border/60;
-  }
-
-  .generate-btn {
-    @apply relative inline-flex items-center gap-2 px-10 py-4 rounded-xl text-base font-bold transition-all duration-200;
-    background: linear-gradient(135deg, hsl(220,85%,22%), hsl(210,75%,42%));
+    background: hsl(216 100% 27%);
+    border-color: hsl(216 100% 27%);
     color: white;
-    box-shadow: 0 4px 20px rgba(30,80,170,0.35);
+    box-shadow: 0 4px 18px hsl(216 100% 27% / 0.35);
+    transform: translateY(-2px);
+  }
+  .dark .query-type-btn-active {
+    background: hsl(216 80% 48%);
+    border-color: hsl(216 80% 48%);
+    box-shadow: 0 4px 18px hsl(216 80% 48% / 0.35);
+  }
+  .query-type-btn-inactive {
+    @apply bg-card text-foreground border-border;
+  }
+  .query-type-btn-inactive:hover {
+    border-color: hsl(216 100% 27% / 0.45);
+    background: hsl(216 100% 27% / 0.05);
+  }
+
+  /* ── WHERE condition rows ── */
+  .condition-row {
+    @apply flex flex-wrap gap-2 items-start p-3 rounded-xl border border-border/60 bg-muted/30;
+  }
+
+  /* ── Generate button — KRC Navy ── */
+  .generate-btn {
+    @apply relative inline-flex items-center gap-2.5 px-12 py-5 rounded-2xl text-lg font-bold transition-all duration-200;
+    background: linear-gradient(135deg, hsl(216 100% 22%), hsl(216 100% 34%));
+    color: white;
+    box-shadow: 0 4px 20px hsl(216 100% 27% / 0.4);
   }
   .generate-btn:hover:not(:disabled) {
-    transform: translateY(-1px);
-    box-shadow: 0 6px 28px rgba(30,80,170,0.45);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px hsl(216 100% 27% / 0.5);
+    background: linear-gradient(135deg, hsl(216 100% 25%), hsl(216 100% 38%));
   }
-  .generate-btn:active:not(:disabled) {
-    transform: translateY(0);
-  }
-  .generate-btn:disabled {
-    @apply opacity-60 cursor-not-allowed;
-  }
+  .generate-btn:active:not(:disabled) { transform: translateY(0); }
+  .generate-btn:disabled { @apply opacity-60 cursor-not-allowed; }
 
   /* ── Micro-animations ── */
   @keyframes fadeInUp {
     from { opacity: 0; transform: translateY(8px); }
     to   { opacity: 1; transform: translateY(0); }
   }
-  .animate-fade-in-up {
-    animation: fadeInUp 0.25s ease-out;
-  }
+  .animate-fade-in-up { animation: fadeInUp 0.25s ease-out; }
 
   @keyframes pulseGlow {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
-    50%      { box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15); }
+    0%, 100% { box-shadow: 0 0 0 0 hsl(216 100% 27% / 0); }
+    50%       { box-shadow: 0 0 0 5px hsl(216 100% 27% / 0.18); }
   }
-  .pulse-glow {
-    animation: pulseGlow 2s ease-in-out infinite;
-  }
+  .pulse-glow { animation: pulseGlow 2.2s ease-in-out infinite; }
 }

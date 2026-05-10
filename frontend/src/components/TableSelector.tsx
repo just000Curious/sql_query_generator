@@ -68,7 +68,7 @@ const TableSelector = ({ tables, onTablesChange, multiTable = false }: TableSele
   }, [curSchema]);
 
   const addTable = (tableName: string) => {
-    if (tables.some((t) => t.schema === curSchema && t.table === tableName)) return;
+    // Allow same table multiple times for self-joins — unique alias is generated below
     const id = crypto.randomUUID();
 
     // Generate unique alias: first letter + suffix if collision
@@ -152,7 +152,7 @@ const TableSelector = ({ tables, onTablesChange, multiTable = false }: TableSele
                 value={tableSearch}
                 onChange={(e) => setTableSearch(e.target.value)}
                 placeholder={`Search ${curTableList.length} tables…`}
-                className="h-8 text-xs"
+                className="h-9 text-sm"
               />
             )}
             <Select
@@ -167,12 +167,36 @@ const TableSelector = ({ tables, onTablesChange, multiTable = false }: TableSele
                   "Choose a table…"
                 } />
               </SelectTrigger>
-              <SelectContent>
-                {filteredTables.map((t) => (
-                  <SelectItem key={t} value={t}>{t}</SelectItem>
-                ))}
-                {filteredTables.length === 0 && tableSearch && (
+              <SelectContent className="max-h-72">
+                {filteredTables.length === 0 && tableSearch ? (
                   <div className="px-3 py-2 text-xs text-muted-foreground">No tables match "{tableSearch}"</div>
+                ) : tableSearch ? (
+                  // When searching, show flat list
+                  filteredTables.map((t) => (
+                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                  ))
+                ) : (
+                  // When not searching, group by 4-char prefix
+                  (() => {
+                    const groups: Record<string, string[]> = {};
+                    for (const t of filteredTables) {
+                      // Extract prefix: letters up to first underscore or first 4 chars
+                      const prefix = t.includes("_") ? t.split("_").slice(0, 2).join("_") : t.slice(0, 4);
+                      if (!groups[prefix]) groups[prefix] = [];
+                      groups[prefix].push(t);
+                    }
+                    return Object.entries(groups).map(([prefix, items]) => (
+                      <div key={prefix}>
+                        <div className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest border-b border-border/40"
+                          style={{ color: "hsl(24 89% 55%)", background: "hsl(24 89% 53% / 0.06)" }}>
+                          {prefix}_* &nbsp;<span className="font-normal opacity-60">({items.length})</span>
+                        </div>
+                        {items.map((t) => (
+                          <SelectItem key={t} value={t} className="pl-5 text-sm">{t}</SelectItem>
+                        ))}
+                      </div>
+                    ));
+                  })()
                 )}
               </SelectContent>
             </Select>
@@ -182,8 +206,8 @@ const TableSelector = ({ tables, onTablesChange, multiTable = false }: TableSele
 
       {/* Add more tables button (multi-table mode) */}
       {multiTable && tables.length > 0 && (
-        <Button variant="outline" size="sm" className="gap-1.5 text-xs">
-          <Plus className="h-3.5 w-3.5" /> Add Another Table
+        <Button variant="outline" size="default" className="gap-2 text-sm">
+          <Plus className="h-4 w-4" /> Add Another Table
         </Button>
       )}
 

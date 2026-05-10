@@ -33,7 +33,7 @@ const SectionCard = ({
           )}
         </h3>
         {hint && (
-          <span className="text-[11px] text-muted-foreground italic hidden sm:block">{hint}</span>
+          <span className="text-xs text-muted-foreground font-medium hidden sm:block">{hint}</span>
         )}
       </div>
       {children}

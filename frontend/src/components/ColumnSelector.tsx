@@ -2,18 +2,21 @@ import { useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Key, Link, FileText, Calendar, Search, CheckSquare, Square, Star } from "lucide-react";
+import { Key, Link, FileText, Calendar, Search, CheckSquare, Square, Star, Pencil } from "lucide-react";
 import type { SelectedTable } from "@/components/TableSelector";
 
 interface ColumnSelectorProps {
   tables: SelectedTable[];
   selectedColumns: string[];
   onSelectedColumnsChange: (cols: string[]) => void;
+  columnAliases?: Record<string, string>;
+  onColumnAliasesChange?: (aliases: Record<string, string>) => void;
 }
 
-const ColumnSelector = ({ tables, selectedColumns, onSelectedColumnsChange }: ColumnSelectorProps) => {
+const ColumnSelector = ({ tables, selectedColumns, onSelectedColumnsChange, columnAliases = {}, onColumnAliasesChange }: ColumnSelectorProps) => {
   const [search, setSearch] = useState("");
   const [activeTable, setActiveTable] = useState<string | null>(null);
+  const [editingAlias, setEditingAlias] = useState<string | null>(null);
 
   const allColumns = tables.flatMap((t) =>
     t.columns.map((c) => ({
@@ -53,6 +56,18 @@ const ColumnSelector = ({ tables, selectedColumns, onSelectedColumnsChange }: Co
   const clearAll = () => onSelectedColumnsChange([]);
   const selectKeys = () =>
     onSelectedColumnsChange(allColumns.filter((c) => c.isPk || c.isFk).map((c) => c.key));
+
+  const updateAlias = (colKey: string, aliasVal: string) => {
+    if (onColumnAliasesChange) {
+      const next = { ...columnAliases };
+      if (aliasVal.trim()) {
+        next[colKey] = aliasVal.trim();
+      } else {
+        delete next[colKey];
+      }
+      onColumnAliasesChange(next);
+    }
+  };
 
   if (allColumns.length === 0) {
     return (
@@ -126,30 +141,58 @@ const ColumnSelector = ({ tables, selectedColumns, onSelectedColumnsChange }: Co
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-1 max-h-72 overflow-y-auto pr-1">
           {filtered.map((col) => {
             const isSelected = selectedColumns.includes(col.key);
+            const alias = columnAliases[col.key];
             return (
-              <label
-                key={col.key}
-                className={`col-chip ${isSelected ? "col-chip-selected" : "col-chip-unselected"}`}
-                title={col.isFk ? `FK → ${col.fkRef}` : col.type}
-              >
-                <Checkbox
-                  checked={isSelected}
-                  onCheckedChange={() => toggle(col.key)}
-                  className="flex-shrink-0"
-                />
-                {col.isPk ? (
-                  <Key className="h-3 w-3 text-amber-500 flex-shrink-0" />
-                ) : col.isFk ? (
-                  <Link className="h-3 w-3 text-secondary flex-shrink-0" />
-                ) : col.isDate ? (
-                  <Calendar className="h-3 w-3 text-purple-500 flex-shrink-0" />
-                ) : (
-                  <FileText className="h-3 w-3 text-muted-foreground/60 flex-shrink-0" />
+              <div key={col.key} className="flex flex-col">
+                <label
+                  className={`col-chip ${isSelected ? "col-chip-selected" : "col-chip-unselected"}`}
+                  title={col.isFk ? `FK → ${col.fkRef}` : col.type}
+                >
+                  <Checkbox
+                    checked={isSelected}
+                    onCheckedChange={() => toggle(col.key)}
+                    className="flex-shrink-0"
+                  />
+                  {col.isPk ? (
+                    <Key className="h-3 w-3 text-amber-500 flex-shrink-0" />
+                  ) : col.isFk ? (
+                    <Link className="h-3 w-3 text-secondary flex-shrink-0" />
+                  ) : col.isDate ? (
+                    <Calendar className="h-3 w-3 text-purple-500 flex-shrink-0" />
+                  ) : (
+                    <FileText className="h-3 w-3 text-muted-foreground/60 flex-shrink-0" />
+                  )}
+                  <span className="truncate flex-1 font-medium">{col.name}</span>
+                  {col.isPk && <span className="badge-key">PK</span>}
+                  {col.isFk && !col.isPk && <span className="badge-fk">FK</span>}
+                  {isSelected && onColumnAliasesChange && (
+                    <button
+                      className="ml-auto text-muted-foreground hover:text-primary transition-colors"
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingAlias(editingAlias === col.key ? null : col.key); }}
+                      title="Set column alias"
+                    >
+                      <Pencil className="h-2.5 w-2.5" />
+                    </button>
+                  )}
+                </label>
+                {/* Inline alias editor */}
+                {isSelected && editingAlias === col.key && onColumnAliasesChange && (
+                  <div className="flex items-center gap-1 mt-0.5 ml-6">
+                    <span className="text-[9px] text-muted-foreground font-bold">AS</span>
+                    <Input
+                      value={alias || ""}
+                      onChange={(e) => updateAlias(col.key, e.target.value)}
+                      placeholder="alias"
+                      className="h-6 text-[10px] font-mono px-1.5 flex-1"
+                      autoFocus
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === "Escape") setEditingAlias(null); }}
+                    />
+                  </div>
                 )}
-                <span className="truncate flex-1 font-medium">{col.name}</span>
-                {col.isPk && <span className="badge-key">PK</span>}
-                {col.isFk && !col.isPk && <span className="badge-fk">FK</span>}
-              </label>
+                {isSelected && alias && editingAlias !== col.key && (
+                  <span className="text-[9px] text-secondary font-mono ml-6 truncate">AS {alias}</span>
+                )}
+              </div>
             );
           })}
         </div>
@@ -160,6 +203,7 @@ const ColumnSelector = ({ tables, selectedColumns, onSelectedColumnsChange }: Co
         <span className="flex items-center gap-1"><Key className="h-2.5 w-2.5 text-amber-500" /> Primary Key</span>
         <span className="flex items-center gap-1"><Link className="h-2.5 w-2.5 text-secondary" /> Foreign Key</span>
         <span className="flex items-center gap-1"><Calendar className="h-2.5 w-2.5 text-purple-500" /> Date/Time</span>
+        <span className="flex items-center gap-1"><Pencil className="h-2.5 w-2.5" /> Click pencil to set alias</span>
       </div>
     </div>
   );
