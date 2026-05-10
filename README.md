@@ -39,14 +39,14 @@
 |---------|-------------|
 | **Visual Query Builder** | Point-and-click interface for SELECT, JOIN, Aggregate, Date Range, and UNION queries |
 | **6 Query Modes** | Simple SELECT · JOIN · Aggregate · Date Range · UNION · Raw SQL |
-| **Schema Browser** | Navigate GM, HM, PM, SI, SA, TA schemas with full table/column metadata |
+| **Schema Hot-Reloading** | Upload new database schemas instantly via the UI without restarting the server |
+| **Schema Rollback System** | Automatically keeps 3 past schemas and allows 1-click restore/delete |
+| **Standalone Executable** | Packaged into a zero-dependency `.exe` file via PyInstaller |
 | **Live Validation** | Real-time error and warning checks before query generation |
 | **Temp Table / CTE Wrapper** | Optionally wrap output as a `CREATE TEMP TABLE` or `WITH ... AS` CTE |
 | **Query History** | Browser-stored history of generated queries with one-click reload |
 | **Dark / Light Mode** | Toggle between themes with a single click |
-| **Keyboard Shortcuts** | `Ctrl+Enter` to generate, `Ctrl+Shift+C` to copy |
 | **Offline Fallback** | Generates SQL locally if the backend API is unavailable |
-| **No Data Exposure** | The tool generates read-only SELECT statements — never touches production data |
 
 ---
 
@@ -302,7 +302,11 @@ sql-query-generator/
 | `npm run preview` | Preview the production build locally |
 | `npm run lint` | Run ESLint across the codebase |
 | `npm run test` | Run unit tests with Vitest |
-| `npm run test:watch` | Run tests in watch mode |
+### Executable Build (PyInstaller)
+
+| Command | Description |
+|---------|-------------|
+| `python -m PyInstaller SQL_Query_Generator.spec --clean` | Build the standalone `.exe` containing frontend & backend |
 
 ---
 
