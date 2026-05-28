@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, AlertCircle, ChevronDown, ChevronRight } from "lucide-react";
+import { Plus, Trash2, AlertCircle, ChevronDown, ChevronRight, Calendar } from "lucide-react";
 import { useState } from "react";
 import type { SelectedTable } from "@/components/TableSelector";
 
@@ -11,8 +11,8 @@ export interface Condition {
   operator: string;
   value: string;
   logic: "AND" | "OR";
-  groupStart?: boolean;  // opens a parenthesis group before this condition
-  groupEnd?: boolean;    // closes a parenthesis group after this condition
+  groupStart?: boolean;
+  groupEnd?: boolean;
 }
 
 const OPERATORS: { value: string; label: string; hasValue: boolean; placeholder: string; isSubquery?: boolean }[] = [
@@ -35,6 +35,19 @@ const OPERATORS: { value: string; label: string; hasValue: boolean; placeholder:
   { value: "NOT EXISTS",  label: "NOT EXISTS (subquery)",       hasValue: true,  placeholder: "SELECT 1 FROM ... WHERE ...", isSubquery: true },
 ];
 
+// Types that are date/time — used to show a date picker instead of text input
+const DATE_TYPES = new Set([
+  "date", "timestamp", "timestamptz", "timetz", "time",
+  "timestamp without time zone", "timestamp with time zone", "interval",
+]);
+
+// Types that are numeric — show numeric hint
+const NUMERIC_TYPES = new Set([
+  "integer", "int", "int2", "int4", "int8", "bigint", "smallint",
+  "numeric", "decimal", "real", "float", "float4", "float8",
+  "double precision", "serial", "bigserial", "money",
+]);
+
 interface ConditionBuilderProps {
   tables: SelectedTable[];
   conditions: Condition[];
@@ -44,6 +57,7 @@ interface ConditionBuilderProps {
 const ConditionBuilder = ({ tables, conditions, onConditionsChange }: ConditionBuilderProps) => {
   const [expandedSubquery, setExpandedSubquery] = useState<string | null>(null);
 
+  // Build enriched column list with type info
   const allColumns = tables.flatMap((t) =>
     t.columns.map((c) => ({
       key: `${t.alias}.${c.name}`,
@@ -51,8 +65,12 @@ const ConditionBuilder = ({ tables, conditions, onConditionsChange }: ConditionB
       tableLabel: `${t.schema}.${t.table}`,
       alias: t.alias,
       isPk: t.primaryKeys.includes(c.name),
+      colType: (c.type || "").toLowerCase(),
     }))
   );
+
+  const getColMeta = (colKey: string) =>
+    allColumns.find((c) => c.key === colKey) ?? null;
 
   const add = () => {
     onConditionsChange([
@@ -99,6 +117,21 @@ const ConditionBuilder = ({ tables, conditions, onConditionsChange }: ConditionB
         const isExists = opInfo.isSubquery;
         const subExpanded = expandedSubquery === cond.id;
 
+        // Type info for this condition's column
+        const colMeta = getColMeta(cond.column);
+        const colType = colMeta?.colType ?? "";
+        const isDateCol = DATE_TYPES.has(colType);
+        const isNumericCol = NUMERIC_TYPES.has(colType);
+
+        // For BETWEEN with dates, show two date inputs
+        const isBetweenDate = cond.operator === "BETWEEN" && isDateCol;
+        // For BETWEEN, split stored value "start AND end"
+        const betweenParts = isBetweenDate
+          ? cond.value.split(" AND ")
+          : [];
+        const betweenStart = betweenParts[0] ?? "";
+        const betweenEnd = betweenParts[1] ?? "";
+
         return (
           <div key={cond.id} className="space-y-1">
             {/* Group start marker */}
@@ -123,37 +156,54 @@ const ConditionBuilder = ({ tables, conditions, onConditionsChange }: ConditionB
                 </Select>
               )}
 
-              {/* Column picker — hidden for EXISTS (no column needed) */}
+              {/* Column picker */}
               {!isExists && (
-                <Select value={cond.column} onValueChange={(v) => update(cond.id, "column", v)}>
-                  <SelectTrigger className="flex-1 min-w-[200px] h-10 text-sm">
-                    <SelectValue placeholder="Select column..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {tables.map((t) => (
-                      <div key={t.alias}>
-                        <div className="px-2 py-1 text-[10px] font-bold text-muted-foreground uppercase tracking-wider border-b border-border/50">
-                          {t.schema}.{t.table}
+                <div className="flex flex-col flex-1 min-w-[200px]">
+                  <Select
+                    value={cond.column}
+                    onValueChange={(v) => update(cond.id, "column", v)}
+                  >
+                    <SelectTrigger className="w-full h-10 text-sm">
+                      <SelectValue placeholder="Select column..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {tables.map((t) => (
+                        <div key={t.alias}>
+                          <div className="px-2 py-1 text-[10px] font-bold text-muted-foreground uppercase tracking-wider border-b border-border/50">
+                            {t.schema}.{t.table}
+                          </div>
+                          {t.columns.map((c) => {
+                            const key = `${t.alias}.${c.name}`;
+                            const ct = (c.type || "").toLowerCase();
+                            return (
+                              <SelectItem key={key} value={key}>
+                                <span className="flex items-center gap-1.5">
+                                  {DATE_TYPES.has(ct) && <Calendar className="h-3 w-3 text-purple-400 flex-shrink-0" />}
+                                  {c.name}
+                                  {t.primaryKeys.includes(c.name) && " 🔑"}
+                                  {ct && (
+                                    <span className="text-[9px] opacity-40 font-mono ml-auto">{ct.toUpperCase().slice(0, 9)}</span>
+                                  )}
+                                </span>
+                              </SelectItem>
+                            );
+                          })}
                         </div>
-                        {t.columns.map((c) => {
-                          const key = `${t.alias}.${c.name}`;
-                          return (
-                            <SelectItem key={key} value={key}>
-                              {c.name}
-                              {t.primaryKeys.includes(c.name) && " 🔑"}
-                            </SelectItem>
-                          );
-                        })}
-                      </div>
-                    ))}
-                  </SelectContent>
-                </Select>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {/* Data type hint under column picker */}
+                  {colType && (
+                    <span className="text-[9px] ml-1 mt-0.5 font-mono opacity-50">
+                      {isDateCol ? "📅 date type — use YYYY-MM-DD" : isNumericCol ? "🔢 numeric — no quotes needed" : `type: ${colType}`}
+                    </span>
+                  )}
+                </div>
               )}
 
               {/* Operator picker */}
               <Select value={cond.operator} onValueChange={(v) => {
                 update(cond.id, "operator", v);
-                // Clear column if switching to/from EXISTS
                 const newOp = OPERATORS.find(o => o.value === v);
                 if (newOp?.isSubquery) update(cond.id, "column", "");
               }}>
@@ -169,14 +219,49 @@ const ConditionBuilder = ({ tables, conditions, onConditionsChange }: ConditionB
                 </SelectContent>
               </Select>
 
-              {/* Value input — inline for most, expandable textarea for subqueries */}
+              {/* Value input — smart based on column type */}
               {opInfo.hasValue && !isExists && (
-                <Input
-                  value={cond.value}
-                  onChange={(e) => update(cond.id, "value", e.target.value)}
-                  placeholder={opInfo.placeholder}
-                  className="flex-1 min-w-[160px] h-10 text-sm font-mono"
-                />
+                <>
+                  {/* BETWEEN with date column: two date pickers */}
+                  {isBetweenDate ? (
+                    <div className="flex items-center gap-1 flex-1 min-w-[260px]">
+                      <input
+                        type="date"
+                        value={betweenStart}
+                        onChange={(e) => update(cond.id, "value", `${e.target.value} AND ${betweenEnd}`)}
+                        className="flex-1 h-10 rounded-md border border-input bg-background px-2 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-ring"
+                      />
+                      <span className="text-xs font-bold text-muted-foreground">AND</span>
+                      <input
+                        type="date"
+                        value={betweenEnd}
+                        onChange={(e) => update(cond.id, "value", `${betweenStart} AND ${e.target.value}`)}
+                        className="flex-1 h-10 rounded-md border border-input bg-background px-2 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-ring"
+                      />
+                    </div>
+                  ) : isDateCol && cond.operator !== "BETWEEN" && cond.operator !== "IN" && cond.operator !== "NOT IN" ? (
+                    /* Single date picker for date columns */
+                    <input
+                      type="date"
+                      value={cond.value}
+                      onChange={(e) => update(cond.id, "value", e.target.value)}
+                      className="flex-1 min-w-[160px] h-10 rounded-md border border-input bg-background px-2 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-ring"
+                    />
+                  ) : (
+                    /* Default text input for everything else */
+                    <Input
+                      value={cond.value}
+                      onChange={(e) => update(cond.id, "value", e.target.value)}
+                      placeholder={
+                        isNumericCol
+                          ? `${opInfo.placeholder} (number)`
+                          : opInfo.placeholder
+                      }
+                      className={`flex-1 min-w-[160px] h-10 text-sm font-mono ${isNumericCol ? "border-blue-400/40" : ""}`}
+                      type={isNumericCol && !["IN","NOT IN","BETWEEN"].includes(cond.operator) ? "number" : "text"}
+                    />
+                  )}
+                </>
               )}
 
               {isExists && (

@@ -49,6 +49,7 @@ const Index = () => {
 
   // Phase 1+2 new state
   const [columnAliases, setColumnAliases] = useState<Record<string, string>>({});
+  const [columnCasts, setColumnCasts] = useState<Record<string, string>>({});
   const [having, setHaving] = useState<HavingCondition[]>([]);
   const [caseExpressions, setCaseExpressions] = useState<CaseExpression[]>([]);
   const [functionColumns, setFunctionColumns] = useState<FunctionColumn[]>([]);
@@ -102,6 +103,7 @@ const Index = () => {
     setQueryStack([]);
     setDistinct(false);
     setColumnAliases({});
+    setColumnCasts({});
     setHaving([]);
     setCaseExpressions([]);
     setFunctionColumns([]);
@@ -244,14 +246,15 @@ const Index = () => {
       const body = {
         tables: selectedTables.map((st) => ({ table: st.table, schema: st.schema, alias: st.alias })),
 
-        // Columns with aliases
+        // Columns with aliases and optional CAST
         columns: selectedColumns.map((col) => {
           const dot = col.indexOf(".");
           const alias = columnAliases[col] || undefined;
+          const cast_as = columnCasts[col] || undefined;
           if (dot !== -1) {
-            return { table: col.slice(0, dot), column: col.slice(dot + 1), alias };
+            return { table: col.slice(0, dot), column: col.slice(dot + 1), alias, cast_as };
           }
-          return { table: "", column: col, alias };
+          return { table: "", column: col, alias, cast_as };
         }),
 
         // Conditions with logic (AND/OR) + date range conditions
@@ -538,6 +541,8 @@ const Index = () => {
                       onSelectedColumnsChange={setSelectedColumns}
                       columnAliases={columnAliases}
                       onColumnAliasesChange={setColumnAliases}
+                      columnCasts={columnCasts}
+                      onColumnCastsChange={setColumnCasts}
                     />
                   </div>
                 )}

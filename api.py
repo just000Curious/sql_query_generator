@@ -130,6 +130,7 @@ class ColumnInput(BaseModel):
     table: str = ""
     column: str
     alias: Optional[str] = None
+    cast_as: Optional[str] = None   # e.g. "VARCHAR", "INTEGER", "DATE", "NUMERIC(10,2)"
 
 class ConditionInput(BaseModel):
     table: str = ""
@@ -217,26 +218,73 @@ class SchemaQueryGenerator:
         self.offset_val = None
         self.distinct_flag = False
 
-    def _format_value(self, value):
-        """Properly format values for SQL"""
+    # Column types that are numeric — value must NOT be quoted
+    _NUMERIC_TYPES = frozenset({
+        "integer", "int", "int2", "int4", "int8", "bigint", "smallint",
+        "numeric", "decimal", "real", "float", "float4", "float8",
+        "double precision", "serial", "bigserial", "money",
+    })
+    # Column types that are date/time — value MUST be quoted as a date literal
+    _DATE_TYPES = frozenset({
+        "date", "timestamp", "timestamptz", "timetz", "time",
+        "timestamp without time zone", "timestamp with time zone",
+        "interval",
+    })
+
+    def _format_value(self, value, col_type: str = None):
+        """
+        Properly format a WHERE / HAVING value for SQL.
+        When col_type is provided (from schema metadata) it drives quoting:
+          - numeric types  → no quotes
+          - date/time types → always quoted as 'YYYY-MM-DD' literals
+          - everything else → string-escaped and quoted
+        When col_type is None the old heuristic (try float()) is used.
+        """
         if value is None:
             return "NULL"
         if isinstance(value, bool):
             return "TRUE" if value else "FALSE"
-        if isinstance(value, str):
-            cleaned = value.strip("'").strip('"')
-            if not cleaned:
-                return "''"
-            try:
-                float(cleaned)
-                return cleaned
-            except ValueError:
-                escaped = cleaned.replace("'", "''")
-                return f"'{escaped}'"
         if isinstance(value, (int, float)):
             return str(value)
         if isinstance(value, (datetime, date)):
             return f"'{value.strftime('%Y-%m-%d')}'"
+
+        if isinstance(value, str):
+            # Strip surrounding quotes that may have been added in the UI
+            cleaned = value.strip().strip("'").strip('"')
+            if not cleaned:
+                return "''"
+
+            ct = (col_type or "").lower().split("(")[0].strip()
+
+            # --- Numeric column: never quote ---
+            if ct in self._NUMERIC_TYPES:
+                try:
+                    float(cleaned)
+                    return cleaned
+                except ValueError:
+                    # User typed something non-numeric into a numeric column; pass through
+                    return cleaned
+
+            # --- Date/time column: always quote and normalise format ---
+            if ct in self._DATE_TYPES:
+                # Strip any quotes user may have added
+                date_val = cleaned.strip("'\"")
+                escaped = date_val.replace("'", "''")
+                return f"'{escaped}'"
+
+            # --- No type info: use heuristic (backward-compatible) ---
+            if ct == "":
+                try:
+                    float(cleaned)
+                    return cleaned
+                except ValueError:
+                    pass
+
+            # --- String / unknown: quote and escape ---
+            escaped = cleaned.replace("'", "''")
+            return f"'{escaped}'"
+
         return f"'{str(value)}'"
 
     def select(self, columns):
@@ -1154,9 +1202,13 @@ def _build_sql_from_request(request: GenerateRequest) -> str:
             expr += f" AS {aalias}"
         select_parts.append(expr)
 
-    # Regular columns
+    # Regular columns (with optional CAST)
     for c in (request.columns or []):
         ref = col_ref(c.table, c.column)
+        # Apply CAST if requested
+        cast = (c.cast_as or "").strip().upper()
+        if cast:
+            ref = f"CAST({ref} AS {cast})"
         if c.alias:
             ref += f" AS {c.alias}"
         select_parts.append(ref)
@@ -1203,6 +1255,25 @@ def _build_sql_from_request(request: GenerateRequest) -> str:
             continue
         ref = col_ref(cond.table, cond.column) if not is_exists else ""
 
+        # Look up the column's data type from schema metadata for smart quoting
+        def _col_type_from_meta(cond) -> str:
+            """Return the data type string from db_manager.schemas, or empty string."""
+            try:
+                t_alias = (cond.table or "").strip()
+                col_name = (cond.column or "").strip()
+                tbl_obj = alias_map.get(t_alias)
+                if not tbl_obj:
+                    return ""
+                schema_upper = tbl_obj.schema.upper()
+                tables_in_schema = db_manager.schemas.get(schema_upper, {})
+                tbl_meta = tables_in_schema.get(tbl_obj.table, {})
+                # column_types key is populated by live feed and JSON if present
+                return tbl_meta.get("column_types", {}).get(col_name, "")
+            except Exception:
+                return ""
+
+        ct = _col_type_from_meta(cond) if not is_exists else ""
+
         if op in ("IS NULL", "IS NOT NULL"):
             clause = f"{ref} {op}"
         elif op == "EXISTS":
@@ -1210,16 +1281,28 @@ def _build_sql_from_request(request: GenerateRequest) -> str:
         elif op == "NOT EXISTS":
             clause = f"NOT EXISTS ({cond.value})"
         elif op in ("IN", "NOT IN"):
-            val = helper._format_value(cond.value)
-            clause = f"{ref} {op} ({val})"
+            # For IN lists, format each item individually
+            raw_items = str(cond.value).split(",")
+            formatted_items = [helper._format_value(v.strip(), ct) for v in raw_items]
+            clause = f"{ref} {op} ({', '.join(formatted_items)})"
         elif op == "BETWEEN":
-            val = helper._format_value(cond.value)
-            clause = f"{ref} BETWEEN {val}"
+            # Expect "start AND end" or "start,end"
+            raw = str(cond.value)
+            if " AND " in raw.upper():
+                parts = raw.upper().split(" AND ", 1)
+                start = raw[:len(parts[0])]
+                end = raw[len(parts[0]) + 5:]
+            elif "," in raw:
+                parts2 = raw.split(",", 1)
+                start, end = parts2[0].strip(), parts2[1].strip()
+            else:
+                start = end = raw
+            clause = f"{ref} BETWEEN {helper._format_value(start, ct)} AND {helper._format_value(end, ct)}"
         elif op in ("LIKE", "NOT LIKE", "ILIKE", "NOT ILIKE"):
-            val = helper._format_value(cond.value)
+            val = helper._format_value(cond.value, "text")  # LIKE values are always strings
             clause = f"{ref} {op} {val}"
         else:
-            val = helper._format_value(cond.value)
+            val = helper._format_value(cond.value, ct)
             clause = f"{ref} {op} {val}"
 
         logic = (getattr(cond, 'logic', 'AND') or 'AND').upper()

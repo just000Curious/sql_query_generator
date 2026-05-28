@@ -39,7 +39,7 @@ export interface TableColumnsResponse {
 
 export interface GenerateQueryRequest {
   tables: { table: string; schema: string; alias: string }[];
-  columns: { table: string; column: string; alias?: string }[];
+  columns: { table: string; column: string; alias?: string; cast_as?: string }[];
   conditions: { table: string; column: string; operator: string; value: string; logic?: string; group_start?: boolean; group_end?: boolean }[];
   joins?: {
     join_type: string;

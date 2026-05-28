@@ -2,8 +2,24 @@ import { useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Key, Link, FileText, Calendar, Search, CheckSquare, Square, Star, Pencil } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Key, Link, FileText, Calendar, Search, CheckSquare, Square, Star, Pencil, ArrowRightLeft } from "lucide-react";
 import type { SelectedTable } from "@/components/TableSelector";
+
+// All SQL CAST targets that are commonly used
+const CAST_OPTIONS = [
+  { value: "", label: "— no cast —" },
+  { value: "VARCHAR", label: "VARCHAR (text)" },
+  { value: "TEXT", label: "TEXT" },
+  { value: "CHAR(10)", label: "CHAR" },
+  { value: "INTEGER", label: "INTEGER (int)" },
+  { value: "BIGINT", label: "BIGINT" },
+  { value: "NUMERIC(18,2)", label: "NUMERIC (decimal)" },
+  { value: "FLOAT", label: "FLOAT" },
+  { value: "BOOLEAN", label: "BOOLEAN" },
+  { value: "DATE", label: "DATE" },
+  { value: "TIMESTAMP", label: "TIMESTAMP" },
+];
 
 interface ColumnSelectorProps {
   tables: SelectedTable[];
@@ -11,18 +27,29 @@ interface ColumnSelectorProps {
   onSelectedColumnsChange: (cols: string[]) => void;
   columnAliases?: Record<string, string>;
   onColumnAliasesChange?: (aliases: Record<string, string>) => void;
+  columnCasts?: Record<string, string>;
+  onColumnCastsChange?: (casts: Record<string, string>) => void;
 }
 
-const ColumnSelector = ({ tables, selectedColumns, onSelectedColumnsChange, columnAliases = {}, onColumnAliasesChange }: ColumnSelectorProps) => {
+const ColumnSelector = ({
+  tables,
+  selectedColumns,
+  onSelectedColumnsChange,
+  columnAliases = {},
+  onColumnAliasesChange,
+  columnCasts = {},
+  onColumnCastsChange,
+}: ColumnSelectorProps) => {
   const [search, setSearch] = useState("");
   const [activeTable, setActiveTable] = useState<string | null>(null);
   const [editingAlias, setEditingAlias] = useState<string | null>(null);
+  const [editingCast, setEditingCast] = useState<string | null>(null);
 
   const allColumns = tables.flatMap((t) =>
     t.columns.map((c) => ({
       key: `${t.alias}.${c.name}`,
       name: c.name,
-      type: (c.type || "TEXT").toUpperCase(),
+      type: (c.type || "TEXT").toLowerCase(),
       table: t.table,
       alias: t.alias,
       isPk: t.primaryKeys.includes(c.name),
@@ -66,6 +93,18 @@ const ColumnSelector = ({ tables, selectedColumns, onSelectedColumnsChange, colu
         delete next[colKey];
       }
       onColumnAliasesChange(next);
+    }
+  };
+
+  const updateCast = (colKey: string, castVal: string) => {
+    if (onColumnCastsChange) {
+      const next = { ...columnCasts };
+      if (castVal) {
+        next[colKey] = castVal;
+      } else {
+        delete next[colKey];
+      }
+      onColumnCastsChange(next);
     }
   };
 
@@ -142,6 +181,7 @@ const ColumnSelector = ({ tables, selectedColumns, onSelectedColumnsChange, colu
           {filtered.map((col) => {
             const isSelected = selectedColumns.includes(col.key);
             const alias = columnAliases[col.key];
+            const cast = columnCasts[col.key];
             return (
               <div key={col.key} className="flex flex-col">
                 <label
@@ -163,18 +203,58 @@ const ColumnSelector = ({ tables, selectedColumns, onSelectedColumnsChange, colu
                     <FileText className="h-3 w-3 text-muted-foreground/60 flex-shrink-0" />
                   )}
                   <span className="truncate flex-1 font-medium">{col.name}</span>
+                  {/* Data type badge */}
+                  <span className="text-[9px] font-mono opacity-40 hidden xl:inline">{col.type.toUpperCase().slice(0, 7)}</span>
                   {col.isPk && <span className="badge-key">PK</span>}
                   {col.isFk && !col.isPk && <span className="badge-fk">FK</span>}
+                  {/* CAST button */}
+                  {isSelected && onColumnCastsChange && (
+                    <button
+                      className={`ml-auto transition-colors ${cast ? "text-orange-500" : "text-muted-foreground hover:text-orange-400"}`}
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingCast(editingCast === col.key ? null : col.key); setEditingAlias(null); }}
+                      title={cast ? `CAST AS ${cast} (click to change)` : "Add type CAST"}
+                    >
+                      <ArrowRightLeft className="h-2.5 w-2.5" />
+                    </button>
+                  )}
+                  {/* Alias button */}
                   {isSelected && onColumnAliasesChange && (
                     <button
-                      className="ml-auto text-muted-foreground hover:text-primary transition-colors"
-                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingAlias(editingAlias === col.key ? null : col.key); }}
+                      className="text-muted-foreground hover:text-primary transition-colors"
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingAlias(editingAlias === col.key ? null : col.key); setEditingCast(null); }}
                       title="Set column alias"
                     >
                       <Pencil className="h-2.5 w-2.5" />
                     </button>
                   )}
                 </label>
+
+                {/* Inline CAST selector */}
+                {isSelected && editingCast === col.key && onColumnCastsChange && (
+                  <div className="flex items-center gap-1 mt-0.5 ml-6">
+                    <ArrowRightLeft className="h-2.5 w-2.5 text-orange-500 flex-shrink-0" />
+                    <Select value={cast || ""} onValueChange={(v) => { updateCast(col.key, v); setEditingCast(null); }}>
+                      <SelectTrigger className="h-6 text-[10px] flex-1">
+                        <SelectValue placeholder="Select type…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CAST_OPTIONS.map((o) => (
+                          <SelectItem key={o.value} value={o.value} className="text-xs">
+                            {o.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {/* Show active CAST badge */}
+                {isSelected && cast && editingCast !== col.key && (
+                  <span className="text-[9px] text-orange-500 font-mono ml-6 truncate">
+                    CAST → {cast}
+                  </span>
+                )}
+
                 {/* Inline alias editor */}
                 {isSelected && editingAlias === col.key && onColumnAliasesChange && (
                   <div className="flex items-center gap-1 mt-0.5 ml-6">
@@ -199,10 +279,11 @@ const ColumnSelector = ({ tables, selectedColumns, onSelectedColumnsChange, colu
       )}
 
       {/* Legend */}
-      <div className="flex gap-3 text-[10px] text-muted-foreground pt-1 border-t border-border/50">
+      <div className="flex flex-wrap gap-3 text-[10px] text-muted-foreground pt-1 border-t border-border/50">
         <span className="flex items-center gap-1"><Key className="h-2.5 w-2.5 text-amber-500" /> Primary Key</span>
         <span className="flex items-center gap-1"><Link className="h-2.5 w-2.5 text-secondary" /> Foreign Key</span>
         <span className="flex items-center gap-1"><Calendar className="h-2.5 w-2.5 text-purple-500" /> Date/Time</span>
+        <span className="flex items-center gap-1"><ArrowRightLeft className="h-2.5 w-2.5 text-orange-500" /> Click to CAST type</span>
         <span className="flex items-center gap-1"><Pencil className="h-2.5 w-2.5" /> Click pencil to set alias</span>
       </div>
     </div>
