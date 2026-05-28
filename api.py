@@ -964,10 +964,21 @@ class PostgresSchemaFetcher:
                 msg = err
             return {"success": False, "error": msg}
 
-    def fetch_schema(self, config: DBConnectionConfig) -> dict:
+    def fetch_schema(self, config: DBConnectionConfig,
+                      base_schema_data: dict = None) -> dict:
         """
         Connect → introspect → disconnect immediately.
-        Returns metadata.json-compatible dict enriched with column_types.
+
+        If `base_schema_data` is supplied (the existing metadata.json structure):
+          - ONLY queries the schemas and tables that already exist in metadata.json
+            (e.g. GM, HM, PM, SI, SA, TA — never 'public' or anything else)
+          - Enriches each table with real `column_types` from the live DB
+          - Tables that exist in metadata.json but are not found in the live DB
+            are kept intact (column_types stays empty — inferred types are used)
+          - Tables that exist ONLY in the live DB are completely IGNORED
+
+        If `base_schema_data` is None, falls back to the old behaviour
+        (fetch all non-system schemas — for diagnostics only).
         """
         try:
             import psycopg2
@@ -984,106 +995,315 @@ class PostgresSchemaFetcher:
             options="-c default_transaction_read_only=on",
         )
         try:
-            result = self._introspect(conn)
+            if base_schema_data:
+                result = self._introspect_targeted(conn, base_schema_data)
+            else:
+                result = self._introspect(conn)
         finally:
             conn.close()  # always disconnect immediately
         return result
 
-    def _introspect(self, conn) -> dict:
-        cur = conn.cursor()
-        excluded = tuple(self.EXCLUDED_SCHEMAS)
+    # ------------------------------------------------------------------
+    # Metadata-guided enrichment (primary path)
+    # ------------------------------------------------------------------
 
-        # 1. All columns with data types
-        cur.execute("""
+    def _introspect_targeted(self, conn, base_schema_data: dict) -> dict:
+        """
+        Only query schemas/tables that already exist in base_schema_data.
+        Returns a new dict with the same structure as base_schema_data but
+        with `column_types` populated from the live PostgreSQL database.
+        """
+        cur = conn.cursor()
+
+        # Build the exact (schema, table) pairs we care about.
+        # metadata.json uses UPPERCASE schema keys (GM, HM, PM ...)
+        # The actual DB may use lowercase (gm, hm, pm ...) — we match both.
+        target_pairs: list[tuple[str, str]] = []
+        for schema_key, tables in base_schema_data.items():
+            for table_name in tables.keys():
+                target_pairs.append((schema_key.lower(), table_name))
+
+        if not target_pairs:
+            return base_schema_data  # nothing to enrich
+
+        # Build a VALUES list for the IN clause: (lower_schema, table_name)
+        placeholders = ",".join(["%s"] * len(target_pairs))
+        flat_values = [item for pair in target_pairs for item in pair]
+
+        # Query columns for ONLY those (schema, table) pairs
+        cur.execute(f"""
             SELECT
                 table_schema,
                 table_name,
                 column_name,
                 CASE
-                    WHEN data_type = 'character varying' THEN 'varchar'
-                    WHEN data_type = 'character'         THEN 'char'
-                    WHEN data_type = 'timestamp without time zone' THEN 'timestamp'
-                    WHEN data_type = 'timestamp with time zone'    THEN 'timestamptz'
-                    WHEN data_type = 'double precision'  THEN 'float'
+                    WHEN data_type = 'character varying'                  THEN 'varchar'
+                    WHEN data_type = 'character'                          THEN 'char'
+                    WHEN data_type = 'timestamp without time zone'        THEN 'timestamp'
+                    WHEN data_type = 'timestamp with time zone'           THEN 'timestamptz'
+                    WHEN data_type = 'double precision'                   THEN 'float'
+                    WHEN data_type = 'integer'                            THEN 'integer'
+                    WHEN data_type = 'bigint'                             THEN 'bigint'
+                    WHEN data_type = 'smallint'                           THEN 'smallint'
+                    WHEN data_type = 'numeric'                            THEN 'numeric'
+                    WHEN data_type = 'boolean'                            THEN 'boolean'
+                    WHEN data_type = 'text'                               THEN 'text'
+                    WHEN data_type = 'date'                               THEN 'date'
                     ELSE data_type
                 END AS data_type
             FROM information_schema.columns
-            WHERE table_schema NOT IN %s
+            WHERE (LOWER(table_schema), table_name) IN ({placeholders})
             ORDER BY table_schema, table_name, ordinal_position
-        """, (excluded,))
-        columns_rows = cur.fetchall()
+        """, flat_values)
+        live_rows = cur.fetchall()
 
-        # 2. Primary keys
-        cur.execute("""
-            SELECT kcu.table_schema, kcu.table_name, kcu.column_name
-            FROM information_schema.key_column_usage         kcu
-            JOIN information_schema.table_constraints        tc
-              ON kcu.constraint_name = tc.constraint_name
-             AND kcu.table_schema    = tc.table_schema
-            WHERE tc.constraint_type = 'PRIMARY KEY'
-              AND kcu.table_schema NOT IN %s
-        """, (excluded,))
-        pk_rows = cur.fetchall()
+        # Build lookup: (UPPER_schema, table) -> {col -> dtype}
+        live_types: dict[tuple[str, str], dict[str, str]] = {}
+        for schema, table, col, dtype in live_rows:
+            key = (schema.upper(), table)
+            if key not in live_types:
+                live_types[key] = {}
+            live_types[key][col] = dtype
 
-        # 3. Foreign keys
-        cur.execute("""
+        # Deep-copy the base structure and inject real column_types
+        import copy
+        result = copy.deepcopy(base_schema_data)
+        for schema_key, tables in result.items():
+            for table_name, table_info in tables.items():
+                live = live_types.get((schema_key.upper(), table_name), {})
+                if live:
+                    # Merge: existing inferred types are overridden by real DB types
+                    merged = dict(table_info.get('column_types', {}))
+                    merged.update(live)
+                    table_info['column_types'] = merged
+                    logger.debug(f"Enriched {schema_key}.{table_name} with {len(live)} live column types")
+                else:
+                    # Table not found in DB — keep existing structure unchanged
+                    logger.debug(f"Table {schema_key}.{table_name} not found in live DB; keeping cached types")
+
+        return result
+
+    # ------------------------------------------------------------------
+    # Metadata-guided enrichment  (PRIMARY PATH)
+    # ------------------------------------------------------------------
+
+    def _introspect_targeted(self, conn, base_schema_data: dict) -> dict:
+        """
+        Queries ONLY the table names that already exist in base_schema_data.
+
+        Architecture insight (from client's metadata extraction SQL):
+          - ALL application tables live in the PostgreSQL 'public' schema.
+          - The 'schema' grouping (GM, HM, PM, SI, SA, TA) is a LOGICAL concept
+            derived from UPPER(LEFT(table_name, 2)) — it is NOT a real pg schema.
+          - So we filter by table_name IN (...) within 'public', not by schema name.
+
+        Returns a deep-copy of base_schema_data with 'column_types' and 'keys'
+        enriched from the live database.  Tables not found in the live DB are
+        kept intact so the full metadata structure is always preserved.
+        """
+        cur = conn.cursor()
+
+        # Collect every table name across all logical modules
+        all_table_names: list[str] = []
+        for tables in base_schema_data.values():
+            all_table_names.extend(tables.keys())
+
+        if not all_table_names:
+            return base_schema_data
+
+        placeholders = ",".join(["%s"] * len(all_table_names))
+
+        # ── Single query adapted from the client's reference SQL ─────────
+        # Uses the same pg_constraint approach for keys and
+        # information_schema.columns for types — filtered to known table names.
+        cur.execute(f"""
+            WITH key_details AS (
+                SELECT
+                    c.conrelid::regclass::text                  AS table_name,
+                    jsonb_object_agg(
+                        a.attname,
+                        jsonb_build_object(
+                            'type',
+                                CASE WHEN c.contype = 'p'
+                                     THEN 'PRIMARY KEY'
+                                     ELSE 'FOREIGN KEY'
+                                END,
+                            'foreign_table',
+                                c.confrelid::regclass::text,
+                            'foreign_column',
+                                (SELECT attname
+                                   FROM pg_attribute
+                                  WHERE attrelid = c.confrelid
+                                    AND attnum   = c.confkey[1])
+                        )
+                    ) AS keys
+                FROM pg_constraint c
+                JOIN pg_attribute  a
+                  ON a.attrelid = c.conrelid
+                 AND a.attnum   = ANY(c.conkey)
+                WHERE c.connamespace = 'public'::regnamespace
+                  AND c.contype IN ('p', 'f')
+                GROUP BY c.conrelid
+            ),
+            col_info AS (
+                SELECT
+                    table_name,
+                    column_name,
+                    ordinal_position,
+                    CASE
+                        WHEN data_type = 'character varying'           THEN 'varchar'
+                        WHEN data_type = 'character'                   THEN 'char'
+                        WHEN data_type = 'timestamp without time zone' THEN 'timestamp'
+                        WHEN data_type = 'timestamp with time zone'    THEN 'timestamptz'
+                        WHEN data_type = 'double precision'            THEN 'float'
+                        WHEN data_type = 'integer'                     THEN 'integer'
+                        WHEN data_type = 'bigint'                      THEN 'bigint'
+                        WHEN data_type = 'smallint'                    THEN 'smallint'
+                        WHEN data_type = 'numeric'                     THEN 'numeric'
+                        WHEN data_type = 'boolean'                     THEN 'boolean'
+                        WHEN data_type = 'text'                        THEN 'text'
+                        WHEN data_type = 'date'                        THEN 'date'
+                        ELSE data_type
+                    END AS norm_type
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name IN ({placeholders})
+            )
             SELECT
-                kcu.table_schema,
-                kcu.table_name,
-                kcu.column_name,
-                ccu.table_name  AS foreign_table,
-                ccu.column_name AS foreign_column
-            FROM information_schema.key_column_usage          kcu
-            JOIN information_schema.table_constraints         tc
-              ON kcu.constraint_name = tc.constraint_name
-             AND kcu.table_schema    = tc.table_schema
-            JOIN information_schema.constraint_column_usage   ccu
-              ON ccu.constraint_name = tc.constraint_name
-             AND ccu.table_schema    = tc.table_schema
-            WHERE tc.constraint_type = 'FOREIGN KEY'
-              AND kcu.table_schema NOT IN %s
-        """, (excluded,))
-        fk_rows = cur.fetchall()
+                ci.table_name,
+                jsonb_object_agg(ci.column_name, ci.norm_type
+                                 ORDER BY ci.ordinal_position)  AS column_types,
+                COALESCE(kd.keys, '{{}}'::jsonb)                AS keys
+            FROM col_info ci
+            LEFT JOIN key_details kd ON kd.table_name = ci.table_name
+            GROUP BY ci.table_name, kd.keys
+            ORDER BY ci.table_name
+        """, all_table_names)
 
-        # Build lookup sets
-        pk_set: dict = {}   # (schema, table, col) → True
-        for schema, table, col in pk_rows:
-            pk_set[(schema.upper(), table, col)] = True
+        rows = cur.fetchall()
 
-        fk_map: dict = {}   # (schema, table, col) → (foreign_table, foreign_col)
-        for schema, table, col, ftable, fcol in fk_rows:
-            fk_map[(schema.upper(), table, col)] = (ftable, fcol)
+        # Build lookup: table_name -> {column_types, keys}
+        live: dict[str, dict] = {}
+        for table_name, col_types_json, keys_json in rows:
+            live[table_name] = {
+                "column_types": dict(col_types_json) if col_types_json else {},
+                "keys":         dict(keys_json)       if keys_json       else {},
+            }
 
-        # Assemble final structure
+        matched   = len(live)
+        unmatched = len(all_table_names) - matched
+        logger.info(
+            "Live enrichment: %d/%d tables found in DB (%d not in live DB, kept from cache)",
+            matched, len(all_table_names), unmatched
+        )
+
+        # Deep-copy the base structure and inject live data
+        import copy
+        result = copy.deepcopy(base_schema_data)
+        for schema_key, tables in result.items():
+            for table_name, table_info in tables.items():
+                if table_name in live:
+                    lv = live[table_name]
+                    # Merge column_types: live DB overrides cached inferred types
+                    merged = dict(table_info.get("column_types", {}))
+                    merged.update(lv["column_types"])
+                    table_info["column_types"] = merged
+                    # Update keys from live DB if available
+                    if lv["keys"]:
+                        table_info["keys"] = lv["keys"]
+                # else: table not in live DB — keep cached data unchanged
+
+        return result
+
+    # ------------------------------------------------------------------
+    # Full introspection  (fallback — used when no base_schema_data)
+    # ------------------------------------------------------------------
+
+    def _introspect(self, conn) -> dict:
+        """
+        Fetch ALL application tables from the 'public' schema and group them
+        by the logical module prefix  UPPER(LEFT(table_name, 2))  — exactly
+        the same logic as the client's metadata-extraction SQL.
+        Used as fallback only when no base_schema_data is available.
+        """
+        cur = conn.cursor()
+
+        # Mirror the client's reference SQL exactly
+        cur.execute("""
+            WITH key_details AS (
+                SELECT
+                    c.conrelid::regclass::text AS table_name,
+                    jsonb_object_agg(
+                        a.attname,
+                        jsonb_build_object(
+                            'type',
+                                CASE WHEN c.contype = 'p'
+                                     THEN 'PRIMARY KEY'
+                                     ELSE 'FOREIGN KEY'
+                                END,
+                            'foreign_table',
+                                c.confrelid::regclass::text,
+                            'foreign_column',
+                                (SELECT attname
+                                   FROM pg_attribute
+                                  WHERE attrelid = c.confrelid
+                                    AND attnum   = c.confkey[1])
+                        )
+                    ) AS keys
+                FROM pg_constraint c
+                JOIN pg_attribute  a
+                  ON a.attrelid = c.conrelid
+                 AND a.attnum   = ANY(c.conkey)
+                WHERE c.connamespace = 'public'::regnamespace
+                  AND c.contype IN ('p', 'f')
+                GROUP BY c.conrelid
+            ),
+            col_info AS (
+                SELECT
+                    table_name,
+                    column_name,
+                    ordinal_position,
+                    CASE
+                        WHEN data_type = 'character varying'           THEN 'varchar'
+                        WHEN data_type = 'character'                   THEN 'char'
+                        WHEN data_type = 'timestamp without time zone' THEN 'timestamp'
+                        WHEN data_type = 'timestamp with time zone'    THEN 'timestamptz'
+                        WHEN data_type = 'double precision'            THEN 'float'
+                        WHEN data_type = 'integer'                     THEN 'integer'
+                        WHEN data_type = 'bigint'                      THEN 'bigint'
+                        WHEN data_type = 'smallint'                    THEN 'smallint'
+                        WHEN data_type = 'numeric'                     THEN 'numeric'
+                        WHEN data_type = 'boolean'                     THEN 'boolean'
+                        WHEN data_type = 'text'                        THEN 'text'
+                        WHEN data_type = 'date'                        THEN 'date'
+                        ELSE data_type
+                    END AS norm_type
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+            )
+            SELECT
+                UPPER(LEFT(ci.table_name, 2))                   AS module_prefix,
+                ci.table_name,
+                jsonb_object_agg(ci.column_name, ci.norm_type
+                                 ORDER BY ci.ordinal_position)  AS column_types,
+                jsonb_agg(ci.column_name ORDER BY ci.ordinal_position) AS columns,
+                COALESCE(kd.keys, '{}'::jsonb)                  AS keys
+            FROM col_info ci
+            LEFT JOIN key_details kd ON kd.table_name = ci.table_name
+            GROUP BY ci.table_name, kd.keys
+            ORDER BY ci.table_name
+        """)
+        rows = cur.fetchall()
+
         result: dict = {}
-        for schema, table, col, dtype in columns_rows:
-            schema_key = schema.upper()
-            if schema_key not in result:
-                result[schema_key] = {}
-            if table not in result[schema_key]:
-                result[schema_key][table] = {
-                    "columns": [],
-                    "column_types": {},
-                    "keys": {},
-                }
-            result[schema_key][table]["columns"].append(col)
-            result[schema_key][table]["column_types"][col] = dtype
-
-            # Keys
-            if (schema_key, table, col) in pk_set:
-                fk_info = fk_map.get((schema_key, table, col))
-                result[schema_key][table]["keys"][col] = {
-                    "type": "PRIMARY KEY",
-                    "foreign_table": fk_info[0] if fk_info else "-",
-                    "foreign_column": fk_info[1] if fk_info else None,
-                }
-            elif (schema_key, table, col) in fk_map:
-                ftable, fcol = fk_map[(schema_key, table, col)]
-                result[schema_key][table]["keys"][col] = {
-                    "type": "FOREIGN KEY",
-                    "foreign_table": ftable,
-                    "foreign_column": fcol,
-                }
+        for module_prefix, table_name, col_types_json, columns_json, keys_json in rows:
+            if module_prefix not in result:
+                result[module_prefix] = {}
+            result[module_prefix][table_name] = {
+                "columns":      list(columns_json)       if columns_json  else [],
+                "column_types": dict(col_types_json)     if col_types_json else {},
+                "keys":         dict(keys_json)           if keys_json     else {},
+            }
 
         return result
 
@@ -1485,7 +1705,11 @@ async def refresh_schema_from_live_db():
     logger.info(f"Starting live schema refresh from {config.host}:{config.port}/{config.database}")
 
     try:
-        schema_data = pg_fetcher.fetch_schema(config)
+        # Pass the CURRENT metadata.json structure so fetch_schema only
+        # queries the known schemas (GM, HM, PM, SI, SA, TA) and enriches
+        # them with real column_types — never replacing or discarding tables.
+        base_data = db_manager.schema_data  # may be None if not yet loaded
+        schema_data = pg_fetcher.fetch_schema(config, base_data)
     except Exception as e:
         err = str(e)
         if "timeout" in err.lower() or "could not connect" in err.lower():
