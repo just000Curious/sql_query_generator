@@ -6,6 +6,7 @@ SQL Query Generator API with Schema-Based Navigation
 import os
 import re
 import sys
+import socket
 import sqlite3
 import json
 import time
@@ -58,8 +59,9 @@ _LOG_FILE = os.path.join(_LOG_DIR, "app.log")
 
 # --noconsole (PyInstaller) sets sys.stdout / sys.stderr to None.
 # Redirect them to the log file BEFORE anything (uvicorn, logging) touches them.
-# This prevents "NoneType has no attribute isatty" from uvicorn's log formatter.
-_IS_FROZEN_NOCONSOLE = getattr(sys, 'frozen', False) and sys.stdout is None
+# Also handles the case where frozen stdout is a dummy object without isatty().
+_IS_FROZEN = getattr(sys, 'frozen', False)
+_IS_FROZEN_NOCONSOLE = _IS_FROZEN and (sys.stdout is None or not hasattr(sys.stdout, 'isatty'))
 if _IS_FROZEN_NOCONSOLE:
     _log_stream = open(_LOG_FILE, 'a', encoding='utf-8', buffering=1)
     sys.stdout = _log_stream
@@ -1111,6 +1113,10 @@ _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 JSON_PATH = get_resource_path(os.path.join("db_files", "metadata.json"))
 db_manager = SchemaDatabaseManager(json_file_path=JSON_PATH)
 
+# Port is resolved in __main__ (may differ from 8000 if port is in use);
+# lifespan reads this global to print the correct URL and poll health.
+_SERVER_PORT: int = 8000
+
 
 # ============================================================
 # LIFESPAN (replaces deprecated on_event)
@@ -1137,15 +1143,27 @@ async def lifespan(app: FastAPI):
 
     print("Database initialized")
     print("Tables created: %d" % db_manager.tables_created)
-    print("Server ready at http://127.0.0.1:8000")
+    print("Server ready at http://127.0.0.1:%d" % _SERVER_PORT)
     print("Log file: %s" % _LOG_FILE)
-    # Diagnostic: confirm the frontend path that will be served
     print("Frontend dist dir : %s" % DIST_DIR)
     print("index.html exists : %s" % os.path.isfile(INDEX_HTML))
     print("=" * 60)
 
-    # Auto-open browser after a short delay so the server is fully up
-    threading.Timer(1.5, lambda: webbrowser.open("http://127.0.0.1:8000")).start()
+    # Open browser ONLY after server is confirmed healthy — poll /health
+    def _open_browser_when_ready():
+        url = "http://127.0.0.1:%d" % _SERVER_PORT
+        import urllib.request
+        for _ in range(30):          # wait up to 15 seconds
+            try:
+                urllib.request.urlopen(url + "/health", timeout=1)
+                webbrowser.open(url)
+                return
+            except Exception:
+                time.sleep(0.5)
+        # Last resort: open anyway after 15 s
+        webbrowser.open(url)
+
+    threading.Thread(target=_open_browser_when_ready, daemon=True).start()
 
     yield  # App runs here
 
@@ -2078,6 +2096,25 @@ async def general_exception_handler(request, exc):
         }
     )
 
+
+# ============================================================
+# FREE PORT FINDER  — picks 8000 if free, else next available
+# ============================================================
+
+def _find_free_port(preferred: int = 8000) -> int:
+    """Return `preferred` if it's free, otherwise bind to any free port."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        try:
+            s.bind(("127.0.0.1", preferred))
+            return preferred
+        except OSError:
+            pass
+    # preferred is taken — let the OS choose a free port
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
 if __name__ == "__main__":
     # When sys.stdout was None we already redirected it above, so print() is safe.
     print("=" * 60)
@@ -2085,14 +2122,15 @@ if __name__ == "__main__":
     print("=" * 60)
     print()
 
+    # Pick a free port — prefers 8000 but auto-falls back if it's occupied
+    _SERVER_PORT = _find_free_port(8000)
+    if _SERVER_PORT != 8000:
+        logger.warning("Port 8000 is in use — starting on port %d instead", _SERVER_PORT)
+
     uvicorn.run(
         app,
         host="127.0.0.1",
-        port=8000,
+        port=_SERVER_PORT,
         reload=False,     # Must be False inside a PyInstaller bundle
         log_level="info",
-        # Disable uvicorn's own log config when running headless (--noconsole).
-        # Its DefaultFormatter calls sys.stdout.isatty() which crashes when
-        # stdout was None at import time (before our redirect above fixed it).
-        log_config=None if _IS_FROZEN_NOCONSOLE else None,
     )
