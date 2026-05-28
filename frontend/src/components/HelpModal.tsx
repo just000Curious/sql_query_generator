@@ -1,6 +1,6 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BookOpen, Zap, Code2, Keyboard, HelpCircle, AlertTriangle } from "lucide-react";
+import { BookOpen, Zap, Code2, Keyboard, HelpCircle, AlertTriangle, Database } from "lucide-react";
 
 interface HelpModalProps {
   open: boolean;
@@ -40,12 +40,13 @@ const HelpModal = ({ open, onOpenChange }: HelpModalProps) => (
         <DialogTitle className="text-lg font-bold flex items-center gap-2" style={{ color: "hsl(24 89% 55%)" }}>
           <BookOpen className="h-5 w-5" /> SQL Query Generator — Help Center
         </DialogTitle>
-        <p className="text-xs text-muted-foreground">Konkan Railway Corporation · Build SQL queries visually, no coding needed.</p>
+        <p className="text-xs text-muted-foreground">Konkan Railway Corporation · Build SQL queries visually — no coding needed.</p>
       </DialogHeader>
 
       <Tabs defaultValue="start" className="px-6 pb-6">
         <TabsList className="w-full flex-wrap h-auto gap-1 my-4">
           <TabsTrigger value="start" className="text-xs gap-1"><Zap className="h-3 w-3" />Getting Started</TabsTrigger>
+          <TabsTrigger value="schemas" className="text-xs gap-1"><Database className="h-3 w-3" />Schemas & Tables</TabsTrigger>
           <TabsTrigger value="types" className="text-xs gap-1"><Code2 className="h-3 w-3" />Query Types</TabsTrigger>
           <TabsTrigger value="ops" className="text-xs gap-1"><HelpCircle className="h-3 w-3" />Operators</TabsTrigger>
           <TabsTrigger value="keys" className="text-xs gap-1"><Keyboard className="h-3 w-3" />Shortcuts</TabsTrigger>
@@ -57,42 +58,84 @@ const HelpModal = ({ open, onOpenChange }: HelpModalProps) => (
           <div className="rounded-xl p-4 border space-y-4" style={{ background: "hsl(24 89% 53% / 0.05)", borderColor: "hsl(24 89% 53% / 0.2)" }}>
             <p className="text-sm font-semibold" style={{ color: "hsl(24 89% 55%)" }}>Follow these 5 steps to build your first query:</p>
             <div className="space-y-3">
-              <Step n={1} title="Choose a Query Type" desc="Pick Simple SELECT for basic queries, JOIN to combine tables, Aggregate for COUNT/SUM/AVG, Date Range for time filters, or Raw SQL to write your own." />
-              <Step n={2} title="Select Schema → Table → Columns" desc="Choose a schema (GM, HM, PM…), pick a table from the grouped dropdown, then tick the columns you want. Leave all unticked to SELECT *." />
-              <Step n={3} title="Add WHERE Filters (optional)" desc="Click 'Add WHERE Condition', choose a column, pick an operator (=, LIKE, IN, BETWEEN, IS NULL, EXISTS…) and enter a value. Combine with AND / OR." />
-              <Step n={4} title="Sort, Group & Limit" desc="Add ORDER BY columns, set GROUP BY for aggregates, enter LIMIT (default 100) and OFFSET for pagination." />
-              <Step n={5} title="Generate → Copy or Run" desc="Click 'Generate SQL Query' (or Ctrl+Enter). Then Copy SQL to paste into your client, or click 'Run & Preview Results' to execute inline." />
+              <Step n={1} title="Choose a Query Type" desc="Pick Simple SELECT for basic queries, JOIN to combine tables, Aggregate for COUNT/SUM/AVG, Date Range for time-based filters, or Raw SQL to write your own." />
+              <Step n={2} title="Select Schema → Table → Columns" desc="Choose a logical schema (GM, HM, PM, SA, SI, TA), search and pick a table, then tick the columns you need. Leave all unticked to generate SELECT *." />
+              <Step n={3} title="Add WHERE Filters (optional)" desc="Click 'Add WHERE Condition', choose a column — date columns show a date picker automatically, text columns show a text input. Combine multiple conditions with AND / OR." />
+              <Step n={4} title="Type Casting (optional)" desc="Click the CAST button next to any selected column to convert its output type (e.g. date → VARCHAR, numeric → TEXT). The SQL will wrap it in CAST(column AS type)." />
+              <Step n={5} title="Generate → Copy or Run" desc="Click 'Generate SQL Query' (or Ctrl+Enter). Copy the SQL to paste into pgAdmin / DBeaver, or click 'Run & Preview Results' to execute it directly against the live database." />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3 text-xs">
             <div className="rounded-lg p-3 border border-border/60 bg-muted/30">
-              <p className="font-semibold mb-1">💡 Schema prefix tip</p>
-              <p className="text-muted-foreground">No schema prefix is needed in your queries — the PostgreSQL <Tag>search_path</Tag> resolves it automatically.</p>
+              <p className="font-semibold mb-1">💡 No schema prefix needed</p>
+              <p className="text-muted-foreground">All KRC tables live in the PostgreSQL <Tag>public</Tag> schema. The logical groupings GM / HM / PM / SA / SI / TA are based on the first 2 letters of each table name — no schema prefix is needed in generated SQL.</p>
             </div>
             <div className="rounded-lg p-3 border border-border/60 bg-muted/30">
-              <p className="font-semibold mb-1">🔑 Primary Key indicator</p>
-              <p className="text-muted-foreground">Columns marked <Tag>PK</Tag> are primary keys. <Tag>FK</Tag> are foreign keys. Always include PK in JOIN ON conditions.</p>
+              <p className="font-semibold mb-1">🔑 PK / FK indicators</p>
+              <p className="text-muted-foreground">Columns marked <Tag>PK</Tag> are primary keys. <Tag>FK</Tag> are foreign keys. Always include PK/FK columns in JOIN ON conditions for correct results.</p>
             </div>
             <div className="rounded-lg p-3 border border-border/60 bg-muted/30">
-              <p className="font-semibold mb-1">📋 DISTINCT toggle</p>
-              <p className="text-muted-foreground">Enable DISTINCT in the column selector to remove duplicate rows from results.</p>
+              <p className="font-semibold mb-1">🔁 Live Schema Refresh</p>
+              <p className="text-muted-foreground">Click the <strong>Refresh Schema</strong> button in the header after configuring the DB connection. The tool will pull real column types from PostgreSQL, improving date / numeric handling.</p>
             </div>
             <div className="rounded-lg p-3 border border-border/60 bg-muted/30">
               <p className="font-semibold mb-1">🗂️ Wrap as CTE / Temp Table</p>
-              <p className="text-muted-foreground">After generating, use the Wrap card to convert your query into a <Tag>WITH cte AS (…)</Tag> or <Tag>CREATE TEMP TABLE</Tag> block.</p>
+              <p className="text-muted-foreground">After generating, use the Wrap card to convert your query into a <Tag>WITH cte AS (…)</Tag> or <Tag>CREATE TEMP TABLE</Tag> block for use in longer scripts.</p>
             </div>
+          </div>
+        </TabsContent>
+
+        {/* ── SCHEMAS & TABLES ── */}
+        <TabsContent value="schemas" className="space-y-4 mt-0">
+          <p className="text-xs text-muted-foreground">The KRC database uses a single PostgreSQL <Tag>public</Tag> schema. Tables are grouped below by their 2-letter module prefix:</p>
+          <div className="rounded-xl border border-border/60 overflow-hidden">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border" style={{ background: "hsl(24 89% 53% / 0.07)" }}>
+                  <th className="px-4 py-2">Module</th>
+                  <th className="px-4 py-2">Prefix</th>
+                  <th className="px-4 py-2">Description</th>
+                  <th className="px-4 py-2">Tables</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { mod: "GM", prefix: "gm…", desc: "General Management — complaints, correspondence, office orders", count: "85" },
+                  { mod: "HM", prefix: "hm…", desc: "House Management — quarters, allotments, maintenance", count: "150" },
+                  { mod: "PM", prefix: "pm…", desc: "Personnel Management — employees, payroll, transfers, leave", count: "1399" },
+                  { mod: "SA", prefix: "sa…", desc: "Safety — accident reports, inspections, audits", count: "108" },
+                  { mod: "SI", prefix: "si…", desc: "System Integration — stores, inventory, procurement", count: "341" },
+                  { mod: "TA", prefix: "ta…", desc: "Training — courses, nominations, certifications", count: "78" },
+                ].map(({ mod, prefix, desc, count }) => (
+                  <tr key={mod} className="border-b border-border/40 last:border-0">
+                    <td className="px-4 py-2 font-bold text-sm" style={{ color: "hsl(24 89% 55%)" }}>{mod}</td>
+                    <td className="px-4 py-2"><Tag>{prefix}</Tag></td>
+                    <td className="px-4 py-2 text-xs text-muted-foreground">{desc}</td>
+                    <td className="px-4 py-2 text-xs text-muted-foreground font-mono">{count}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="rounded-lg p-3 border text-xs space-y-1" style={{ borderColor: "hsl(216 80% 50% / 0.3)", background: "hsl(216 80% 50% / 0.07)" }}>
+            <p className="font-semibold text-blue-400">🔗 Live DB Connection</p>
+            <p className="text-muted-foreground">
+              Click the <strong>Settings ⚙</strong> icon in the header, enter your PostgreSQL credentials, and click <strong>Save & Test</strong>.
+              Then click <strong>Refresh Schema</strong> — the tool will query the live database and update column types in real time.
+              All 2,161 tables will remain visible; only the type metadata is refreshed.
+            </p>
           </div>
         </TabsContent>
 
         {/* ── QUERY TYPES ── */}
         <TabsContent value="types" className="space-y-4 mt-0">
           {[
-            { icon: "📋", name: "Simple SELECT", desc: "Fetch rows from a single table. Choose columns, add WHERE filters, sort and limit. Best for straightforward lookups.", eg: "SELECT emp_no, emp_name FROM pmm_employee WHERE dept = 'TE' LIMIT 50" },
-            { icon: "🔗", name: "JOIN", desc: "Combine two or more tables using INNER, LEFT, RIGHT, or FULL joins. Select both tables, then define the ON condition (usually matching primary ↔ foreign keys).", eg: "SELECT e.emp_no, s.salary FROM pmm_employee e INNER JOIN pmm_salary s ON e.emp_no = s.emp_no" },
-            { icon: "📊", name: "Aggregate", desc: "Summarise data with COUNT, SUM, AVG, MIN, MAX. Choose the aggregate function and the column, add GROUP BY to segment, and HAVING to filter groups.", eg: "SELECT dept, COUNT(*) AS total FROM pmm_employee GROUP BY dept HAVING COUNT(*) > 10" },
-            { icon: "📅", name: "Date Range", desc: "Filter a date/timestamp column between two dates. Pick the date column, set From and To dates — the tool generates >= and <= conditions automatically.", eg: "SELECT * FROM gmtk_fwd_hdr WHERE time_stamp >= '2024-01-01' AND time_stamp <= '2024-12-31'" },
-            { icon: "✍️", name: "Raw SQL", desc: "Write your own PostgreSQL SELECT statement directly. Useful for complex subqueries or when you already know the SQL. The system validates and highlights syntax.", eg: "SELECT * FROM (SELECT emp_no, RANK() OVER (ORDER BY salary DESC) AS rnk FROM pmm_salary) t WHERE rnk <= 10" },
+            { icon: "📋", name: "Simple SELECT", desc: "Fetch rows from a single table. Choose columns, add WHERE filters, set ORDER BY, and limit results. Best for straightforward lookups against one table.", eg: "SELECT emp_no, emp_name\nFROM pmt_employee\nWHERE dept_code = 'TE'\nORDER BY emp_no\nLIMIT 50" },
+            { icon: "🔗", name: "JOIN", desc: "Combine two or more tables. Select both tables, choose join type (INNER / LEFT / RIGHT / FULL), then define the ON condition by picking matching columns from each table. Add SELECT columns from any joined table.", eg: "SELECT e.emp_no, e.emp_firstname, i.policy_no\nFROM pmt_employee e\nINNER JOIN pmt_emp_insurance i\n  ON e.emp_no = i.emp_no" },
+            { icon: "📊", name: "Aggregate", desc: "Summarise data with COUNT, SUM, AVG, MIN, MAX. Pick the aggregate function and target column. Add GROUP BY to segment results, and HAVING to filter groups.", eg: "SELECT dept_code, COUNT(*) AS total_employees\nFROM pmt_employee\nGROUP BY dept_code\nHAVING COUNT(*) > 10\nORDER BY total_employees DESC" },
+            { icon: "📅", name: "Date Range", desc: "Filter a date column between two dates. Pick the date column from the dropdown, then set From and To using the date pickers (or click shortcuts like 'This Month', 'This Year'). The WHERE clause is generated automatically.", eg: "SELECT emp_no, policy_start_dt\nFROM pmt_emp_insurance\nWHERE policy_start_dt >= '2024-01-01'\n  AND policy_start_dt <= '2024-12-31'" },
+            { icon: "✍️", name: "Raw SQL", desc: "Write your own PostgreSQL SELECT statement directly in the text area. Useful for subqueries, window functions, CTEs, or any query too complex for the visual builder. The system validates and highlights syntax.", eg: "SELECT emp_no,\n       RANK() OVER (PARTITION BY dept_code ORDER BY basic_pay DESC) AS pay_rank\nFROM pmt_salary\nWHERE pay_year = 2024" },
           ].map(({ icon, name, desc, eg }) => (
             <div key={name} className="rounded-xl border border-border/60 overflow-hidden">
               <div className="flex items-center gap-2 px-4 py-2.5 font-semibold text-sm" style={{ background: "hsl(24 89% 53% / 0.08)" }}>
@@ -118,23 +161,29 @@ const HelpModal = ({ open, onOpenChange }: HelpModalProps) => (
               </tr>
             </thead>
             <tbody>
-              <Row op="= / !=" eg="'TE'" desc="Exact match or exclusion. Works on text, numbers, dates." />
-              <Row op="> / >= / < / <=" eg="50000" desc="Numeric or date comparisons." />
+              <Row op="= / !=" eg="'TE'" desc="Exact match or exclusion. Works on text, numbers, and dates." />
+              <Row op="> / >= / < / <=" eg="50000" desc="Numeric or date comparisons. Date columns show a date picker." />
               <Row op="LIKE" eg="%Singh%" desc="Case-sensitive pattern. % = any chars, _ = one char." />
-              <Row op="ILIKE" eg="%singh%" desc="Case-insensitive pattern (PostgreSQL only). Use instead of LIKE when case doesn't matter." />
+              <Row op="ILIKE" eg="%singh%" desc="Case-insensitive pattern (PostgreSQL). Use when case doesn't matter." />
               <Row op="NOT LIKE / NOT ILIKE" eg="%temp%" desc="Rows where the pattern does NOT match." />
-              <Row op="IN" eg="'TE','CE','ME'" desc="Match any of a comma-separated list of values." />
+              <Row op="IN" eg="'TE','CE','ME'" desc="Match any value in a comma-separated list." />
               <Row op="NOT IN" eg="'X','Y'" desc="Exclude any of the listed values." />
-              <Row op="BETWEEN" eg="10000 AND 50000" desc="Inclusive range. Enter as: start AND end." />
-              <Row op="IS NULL" eg="—" desc="Column has no value (empty). No value needed." />
-              <Row op="IS NOT NULL" eg="—" desc="Column has any value. No value needed." />
-              <Row op="EXISTS" eg="SELECT 1 FROM …" desc="True if the subquery returns any row. Enter the inner SELECT in the expanded text area." />
-              <Row op="NOT EXISTS" eg="SELECT 1 FROM …" desc="True if the subquery returns NO rows." />
+              <Row op="BETWEEN" eg="2024-01-01" desc="Inclusive date or numeric range. Two date pickers appear for date columns." />
+              <Row op="IS NULL" eg="—" desc="Column has no value. No input needed." />
+              <Row op="IS NOT NULL" eg="—" desc="Column has any value. No input needed." />
+              <Row op="EXISTS" eg="SELECT 1 FROM …" desc="True if subquery returns any row. Enter inner SELECT in the text area." />
+              <Row op="NOT EXISTS" eg="SELECT 1 FROM …" desc="True if subquery returns NO rows." />
             </tbody>
           </table>
+
+          <div className="rounded-lg p-3 border text-xs space-y-2" style={{ borderColor: "hsl(24 89% 53% / 0.25)", background: "hsl(24 89% 53% / 0.05)" }}>
+            <p className="font-semibold" style={{ color: "hsl(24 89% 55%)" }}>📅 Smart Date Inputs</p>
+            <p className="text-muted-foreground">When you select a column whose type is <Tag>date</Tag>, <Tag>timestamp</Tag>, or <Tag>timestamptz</Tag>, the value field automatically switches to a date picker. The value is formatted to match the exact date format stored in the database (from the live schema or metadata).</p>
+          </div>
+
           <div className="rounded-lg p-3 border text-xs space-y-1" style={{ borderColor: "hsl(24 89% 53% / 0.25)", background: "hsl(24 89% 53% / 0.05)" }}>
             <p className="font-semibold" style={{ color: "hsl(24 89% 55%)" }}>Grouping conditions with ( )</p>
-            <p className="text-muted-foreground">Each condition row has small <code className="bg-muted px-1 rounded">( )</code> buttons on the right. Click <strong>(</strong> to open a parenthesis before that condition and <strong>)</strong> to close after it. This lets you build logic like <code className="bg-muted px-1 rounded">(A OR B) AND C</code>.</p>
+            <p className="text-muted-foreground">Each condition row has small <code className="bg-muted px-1 rounded">( )</code> buttons. Click <strong>(</strong> to open a parenthesis before that condition and <strong>)</strong> to close after it. This lets you build logic like <code className="bg-muted px-1 rounded">(A OR B) AND C</code>.</p>
           </div>
         </TabsContent>
 
@@ -142,9 +191,9 @@ const HelpModal = ({ open, onOpenChange }: HelpModalProps) => (
         <TabsContent value="keys" className="mt-0 space-y-3">
           <p className="text-xs text-muted-foreground mb-3">Keyboard shortcuts to speed up your workflow:</p>
           {[
-            { keys: ["Ctrl", "Enter"], action: "Generate SQL Query — the main action, works from anywhere on the page." },
+            { keys: ["Ctrl", "Enter"], action: "Generate SQL Query — the main action. Works from anywhere on the page." },
             { keys: ["Ctrl", "Shift", "C"], action: "Copy the generated SQL to clipboard without clicking the Copy button." },
-            { keys: ["Ctrl", "Shift", "R"], action: "(Browser) Hard refresh — clears cached files and reloads the latest build." },
+            { keys: ["Ctrl", "Shift", "R"], action: "Hard refresh — clears cached files and reloads the latest build." },
           ].map(({ keys, action }) => (
             <div key={action} className="flex items-start gap-4 p-3 rounded-lg border border-border/60 bg-muted/20">
               <div className="flex items-center gap-1 flex-shrink-0">
@@ -161,11 +210,12 @@ const HelpModal = ({ open, onOpenChange }: HelpModalProps) => (
           <div className="mt-4 rounded-xl p-4 border border-border/60 bg-muted/20 text-xs space-y-2">
             <p className="font-semibold">Mouse tips</p>
             <ul className="space-y-1 text-muted-foreground list-disc list-inside">
-              <li>Click a column chip to select/deselect it. Click <strong>All</strong> to select all columns.</li>
-              <li>Click <strong>Keys Only</strong> to quickly select only primary and foreign key columns.</li>
-              <li>Click the history icon (top-right) to see past queries and reload them.</li>
-              <li>Click the moon/sun icon to toggle dark/light mode.</li>
-              <li>Click <strong>Reset</strong> to clear all fields and start fresh.</li>
+              <li>Click a column chip to select/deselect it. Click <strong>All</strong> to select all columns at once.</li>
+              <li>Click <strong>Keys Only</strong> to select only primary and foreign key columns — ideal for JOIN queries.</li>
+              <li>Click the <strong>CAST</strong> button next to a selected column to change its output data type.</li>
+              <li>Click the history icon (top-right) to view past queries and reload any of them.</li>
+              <li>Click the moon/sun icon to toggle between dark and light mode.</li>
+              <li>Click <strong>Reset</strong> to clear all fields and start a fresh query.</li>
             </ul>
           </div>
         </TabsContent>
@@ -175,35 +225,39 @@ const HelpModal = ({ open, onOpenChange }: HelpModalProps) => (
           {[
             {
               q: "The Generate button is greyed out — why?",
-              a: "There is a validation error shown in red below the builder. Common causes: no table selected, a WHERE condition is missing a value, or a JOIN condition has no ON column. Fix the highlighted error and the button will activate."
+              a: "A validation error is shown in red below the builder. Common causes: no table selected, a WHERE condition is missing a value, or a JOIN has no ON column defined. Fix the highlighted error and the button will activate."
+            },
+            {
+              q: "The schema dropdown shows only 'PUBLIC' instead of GM/HM/PM…",
+              a: "This happens when the frontend connects to the wrong port. The backend auto-selects a free port if 8000 is in use. Refresh the page — the app always uses relative URLs so it will connect to the correct port automatically."
             },
             {
               q: "My query runs but returns 0 rows.",
-              a: "Check your WHERE values — text values must match exactly (case-sensitive by default). Try removing conditions one at a time, or switch LIKE to ILIKE for case-insensitive matching. Also verify the LIMIT isn't 0."
+              a: "Check your WHERE values — text values must match exactly (case-sensitive by default). Try removing conditions one at a time, or switch LIKE to ILIKE for case-insensitive matching. Also verify the LIMIT is not 0."
             },
             {
               q: "I see a 'CROSS JOIN' warning in the SQL.",
-              a: "This appears when you have multiple tables in JOIN mode but no ON condition defined. Go to the JOIN section, make sure both left and right columns are selected for every join."
+              a: "This appears when you have multiple tables in JOIN mode but no ON condition defined. In the JOIN section, make sure both left and right columns are set for every join row."
             },
             {
               q: "'API Offline' banner is showing.",
-              a: "The Python backend is not running. Open a terminal, navigate to the project folder, and run: python api.py. The banner will disappear within 15 seconds once the API is online."
+              a: "The Python backend is not running. If using the .exe, double-click SQL_Query_Generator.exe and wait 5–10 seconds — the browser opens automatically once it is ready. If running from source, open a terminal and run: python api.py"
+            },
+            {
+              q: "How do I refresh the schema from the live database?",
+              a: "Click the Settings ⚙ icon in the header → enter PostgreSQL credentials → Save & Test. Then click the Refresh Schema button (circular arrow icon). The tool will query only the 2,161 KRC tables and update column types. The schema structure (GM/HM/PM…) is always preserved."
             },
             {
               q: "How do I do a subquery with EXISTS?",
-              a: "In the WHERE section, click 'Add WHERE Condition', set the operator to 'EXISTS (subquery)', then click 'Enter subquery'. A text area appears — type the inner SELECT statement there (e.g. SELECT 1 FROM orders o WHERE o.emp_no = e.emp_no)."
+              a: "In the WHERE section, click 'Add WHERE Condition', set the operator to 'EXISTS (subquery)', then click 'Enter subquery'. A text area appears — type the inner SELECT statement (e.g. SELECT 1 FROM pmt_employee e WHERE e.emp_no = s.emp_no)."
             },
             {
               q: "Can I save my query to a file?",
-              a: "Yes — click 'Save .sql' button below the generated query. It downloads a timestamped .sql file you can open in pgAdmin, DBeaver, or any text editor."
-            },
-            {
-              q: "How do I reuse a query I built earlier?",
-              a: "Click the History icon in the top-right corner. All previously generated queries are listed. Click any one to load it back into the Raw SQL editor."
+              a: "Yes — click the 'Save .sql' button below the generated query. It downloads a timestamped .sql file you can open in pgAdmin, DBeaver, or any text editor."
             },
             {
               q: "Window functions / CASE expressions are not visible.",
-              a: "These are in the Advanced sections that appear when you scroll down past the main builder. Look for 'Window Functions', 'CASE Expressions', and 'Custom Functions' cards."
+              a: "These are in the Advanced sections below the main builder. Scroll down past the WHERE conditions to find 'Window Functions', 'CASE Expressions', and 'Custom Functions' cards."
             },
           ].map(({ q, a }) => (
             <div key={q} className="rounded-xl border border-border/60 overflow-hidden">

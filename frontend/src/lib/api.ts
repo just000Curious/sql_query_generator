@@ -1,11 +1,7 @@
-// When the frontend is served by the FastAPI backend (exe or dev server proxy),
-// use a relative base so all fetch() calls go to the same origin automatically.
-// Fall back to an explicit URL only during standalone frontend dev.
-const API_BASE =
-  import.meta.env.VITE_API_BASE_URL ||
-  (typeof window !== "undefined" && window.location.port === "8000"
-    ? ""                          // same-origin: relative URLs work fine
-    : "http://localhost:8000");   // standalone frontend dev (e.g. Vite on :5173)
+// The frontend is always served by the FastAPI backend (same origin).
+// Use relative URLs so all fetch() calls go to whatever port the server
+// actually started on — never hardcode port 8000.
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
 
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {

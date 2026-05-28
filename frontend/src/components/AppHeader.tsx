@@ -22,14 +22,13 @@ const AppHeader = ({ sessionId, onHelpOpen, onClearAll, onHistoryOpen }: AppHead
   const [dbStatus, setDbStatus] = useState<DBConnectionStatus | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Poll API health
+  // Poll API health — use a relative URL so it always hits the correct port
   useEffect(() => {
-    const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
     const check = async () => {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 3000);
       try {
-        const res = await fetch(`${API_BASE}/health`, { signal: controller.signal });
+        const res = await fetch("/health", { signal: controller.signal });
         clearTimeout(timer);
         setApiStatus(res.ok ? "online" : "offline");
       } catch {
