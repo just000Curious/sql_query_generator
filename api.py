@@ -732,6 +732,319 @@ class SchemaDatabaseManager:
 
 
 # ============================================================
+# LIVE POSTGRESQL CONNECTION — Pydantic Models
+# ============================================================
+
+class DBConnectionConfig(BaseModel):
+    host: str = "localhost"
+    port: int = 5432
+    database: str
+    username: str
+    password: str
+
+class DBConnectionStatus(BaseModel):
+    configured: bool
+    last_refresh: Optional[str] = None
+    source: str = "none"           # "live" | "cache" | "none"
+    host_masked: Optional[str] = None
+    database: Optional[str] = None
+    schemas_loaded: int = 0
+    tables_loaded: int = 0
+
+
+# ============================================================
+# CREDENTIAL MANAGER  — encrypts password on disk
+# ============================================================
+
+class CredentialManager:
+    """
+    Saves connection credentials to a local JSON file in the user's home dir.
+    Password is encrypted with Fernet (symmetric, machine-local key).
+    """
+    CONFIG_DIR  = os.path.join(os.path.expanduser("~"), "SQL_Query_Generator_config")
+    CONFIG_FILE = os.path.join(CONFIG_DIR, "conn_config.json")
+    KEY_FILE    = os.path.join(CONFIG_DIR, "conn.key")
+
+    def _get_or_create_key(self) -> bytes:
+        os.makedirs(self.CONFIG_DIR, exist_ok=True)
+        if os.path.exists(self.KEY_FILE):
+            with open(self.KEY_FILE, "rb") as f:
+                return f.read()
+        try:
+            from cryptography.fernet import Fernet
+            key = Fernet.generate_key()
+            with open(self.KEY_FILE, "wb") as f:
+                f.write(key)
+            return key
+        except ImportError:
+            # Fallback: no encryption, store base64-encoded password
+            return b""
+
+    def save(self, config: DBConnectionConfig) -> None:
+        os.makedirs(self.CONFIG_DIR, exist_ok=True)
+        key = self._get_or_create_key()
+        try:
+            from cryptography.fernet import Fernet
+            f = Fernet(key)
+            encrypted_pw = f.encrypt(config.password.encode()).decode()
+        except ImportError:
+            import base64
+            encrypted_pw = base64.b64encode(config.password.encode()).decode()
+
+        data = {
+            "host": config.host,
+            "port": config.port,
+            "database": config.database,
+            "username": config.username,
+            "password_enc": encrypted_pw,
+        }
+        with open(self.CONFIG_FILE, "w", encoding="utf-8") as fp:
+            json.dump(data, fp, indent=2)
+        logger.info(f"Credentials saved for {config.username}@{config.host}:{config.port}/{config.database}")
+
+    def load(self) -> Optional[DBConnectionConfig]:
+        if not os.path.exists(self.CONFIG_FILE):
+            return None
+        try:
+            with open(self.CONFIG_FILE, "r", encoding="utf-8") as fp:
+                data = json.load(fp)
+            key = self._get_or_create_key()
+            try:
+                from cryptography.fernet import Fernet
+                f = Fernet(key)
+                password = f.decrypt(data["password_enc"].encode()).decode()
+            except Exception:
+                import base64
+                password = base64.b64decode(data["password_enc"].encode()).decode()
+            return DBConnectionConfig(
+                host=data["host"],
+                port=data["port"],
+                database=data["database"],
+                username=data["username"],
+                password=password,
+            )
+        except Exception as e:
+            logger.error(f"Failed to load credentials: {e}")
+            return None
+
+    def clear(self) -> None:
+        if os.path.exists(self.CONFIG_FILE):
+            os.remove(self.CONFIG_FILE)
+            logger.info("Credentials cleared")
+
+    def is_configured(self) -> bool:
+        return os.path.exists(self.CONFIG_FILE)
+
+    def host_masked(self) -> Optional[str]:
+        if not os.path.exists(self.CONFIG_FILE):
+            return None
+        try:
+            with open(self.CONFIG_FILE, "r", encoding="utf-8") as fp:
+                data = json.load(fp)
+            return data.get("host")
+        except Exception:
+            return None
+
+    def database_name(self) -> Optional[str]:
+        if not os.path.exists(self.CONFIG_FILE):
+            return None
+        try:
+            with open(self.CONFIG_FILE, "r", encoding="utf-8") as fp:
+                data = json.load(fp)
+            return data.get("database")
+        except Exception:
+            return None
+
+
+# ============================================================
+# POSTGRES SCHEMA FETCHER — live introspection
+# ============================================================
+
+class PostgresSchemaFetcher:
+    """
+    Opens a SHORT-LIVED read-only PostgreSQL connection, introspects
+    information_schema, and returns a metadata.json-compatible dict
+    that also includes column_types for smarter UI rendering.
+    """
+
+    EXCLUDED_SCHEMAS = frozenset({
+        "pg_catalog", "information_schema", "pg_toast",
+        "pg_temp_1", "pg_toast_temp_1",
+    })
+
+    def test_connection(self, config: DBConnectionConfig) -> dict:
+        """Quick connectivity check — connect and immediately disconnect."""
+        start = time.time()
+        try:
+            import psycopg2
+        except ImportError:
+            return {"success": False, "error": "psycopg2 not installed. Run: pip install psycopg2-binary"}
+        try:
+            conn = psycopg2.connect(
+                host=config.host,
+                port=config.port,
+                dbname=config.database,
+                user=config.username,
+                password=config.password,
+                connect_timeout=10,
+                options="-c default_transaction_read_only=on",
+            )
+            conn.close()
+            latency = round((time.time() - start) * 1000)
+            return {"success": True, "latency_ms": latency}
+        except Exception as e:
+            err = str(e)
+            if "timeout" in err.lower() or "could not connect" in err.lower() or "connection refused" in err.lower():
+                msg = f"Server unreachable ({config.host}:{config.port}). Is FortiClient VPN active?"
+            elif "password authentication" in err.lower():
+                msg = "Authentication failed. Check username/password."
+            elif "database" in err.lower() and "does not exist" in err.lower():
+                msg = f'Database "{config.database}" not found on server.'
+            else:
+                msg = err
+            return {"success": False, "error": msg}
+
+    def fetch_schema(self, config: DBConnectionConfig) -> dict:
+        """
+        Connect → introspect → disconnect immediately.
+        Returns metadata.json-compatible dict enriched with column_types.
+        """
+        try:
+            import psycopg2
+        except ImportError:
+            raise RuntimeError("psycopg2 not installed. Run: pip install psycopg2-binary")
+
+        conn = psycopg2.connect(
+            host=config.host,
+            port=config.port,
+            dbname=config.database,
+            user=config.username,
+            password=config.password,
+            connect_timeout=10,
+            options="-c default_transaction_read_only=on",
+        )
+        try:
+            result = self._introspect(conn)
+        finally:
+            conn.close()  # always disconnect immediately
+        return result
+
+    def _introspect(self, conn) -> dict:
+        cur = conn.cursor()
+        excluded = tuple(self.EXCLUDED_SCHEMAS)
+
+        # 1. All columns with data types
+        cur.execute("""
+            SELECT
+                table_schema,
+                table_name,
+                column_name,
+                CASE
+                    WHEN data_type = 'character varying' THEN 'varchar'
+                    WHEN data_type = 'character'         THEN 'char'
+                    WHEN data_type = 'timestamp without time zone' THEN 'timestamp'
+                    WHEN data_type = 'timestamp with time zone'    THEN 'timestamptz'
+                    WHEN data_type = 'double precision'  THEN 'float'
+                    ELSE data_type
+                END AS data_type
+            FROM information_schema.columns
+            WHERE table_schema NOT IN %s
+            ORDER BY table_schema, table_name, ordinal_position
+        """, (excluded,))
+        columns_rows = cur.fetchall()
+
+        # 2. Primary keys
+        cur.execute("""
+            SELECT kcu.table_schema, kcu.table_name, kcu.column_name
+            FROM information_schema.key_column_usage         kcu
+            JOIN information_schema.table_constraints        tc
+              ON kcu.constraint_name = tc.constraint_name
+             AND kcu.table_schema    = tc.table_schema
+            WHERE tc.constraint_type = 'PRIMARY KEY'
+              AND kcu.table_schema NOT IN %s
+        """, (excluded,))
+        pk_rows = cur.fetchall()
+
+        # 3. Foreign keys
+        cur.execute("""
+            SELECT
+                kcu.table_schema,
+                kcu.table_name,
+                kcu.column_name,
+                ccu.table_name  AS foreign_table,
+                ccu.column_name AS foreign_column
+            FROM information_schema.key_column_usage          kcu
+            JOIN information_schema.table_constraints         tc
+              ON kcu.constraint_name = tc.constraint_name
+             AND kcu.table_schema    = tc.table_schema
+            JOIN information_schema.constraint_column_usage   ccu
+              ON ccu.constraint_name = tc.constraint_name
+             AND ccu.table_schema    = tc.table_schema
+            WHERE tc.constraint_type = 'FOREIGN KEY'
+              AND kcu.table_schema NOT IN %s
+        """, (excluded,))
+        fk_rows = cur.fetchall()
+
+        # Build lookup sets
+        pk_set: dict = {}   # (schema, table, col) → True
+        for schema, table, col in pk_rows:
+            pk_set[(schema.upper(), table, col)] = True
+
+        fk_map: dict = {}   # (schema, table, col) → (foreign_table, foreign_col)
+        for schema, table, col, ftable, fcol in fk_rows:
+            fk_map[(schema.upper(), table, col)] = (ftable, fcol)
+
+        # Assemble final structure
+        result: dict = {}
+        for schema, table, col, dtype in columns_rows:
+            schema_key = schema.upper()
+            if schema_key not in result:
+                result[schema_key] = {}
+            if table not in result[schema_key]:
+                result[schema_key][table] = {
+                    "columns": [],
+                    "column_types": {},
+                    "keys": {},
+                }
+            result[schema_key][table]["columns"].append(col)
+            result[schema_key][table]["column_types"][col] = dtype
+
+            # Keys
+            if (schema_key, table, col) in pk_set:
+                fk_info = fk_map.get((schema_key, table, col))
+                result[schema_key][table]["keys"][col] = {
+                    "type": "PRIMARY KEY",
+                    "foreign_table": fk_info[0] if fk_info else "-",
+                    "foreign_column": fk_info[1] if fk_info else None,
+                }
+            elif (schema_key, table, col) in fk_map:
+                ftable, fcol = fk_map[(schema_key, table, col)]
+                result[schema_key][table]["keys"][col] = {
+                    "type": "FOREIGN KEY",
+                    "foreign_table": ftable,
+                    "foreign_column": fcol,
+                }
+
+        return result
+
+
+# ============================================================
+# Global singletons for live connection
+# ============================================================
+
+credential_manager = CredentialManager()
+pg_fetcher = PostgresSchemaFetcher()
+
+# Tracks refresh state in memory
+_db_connection_status = {
+    "last_refresh": None,
+    "source": "cache",       # "live" | "cache" | "none"
+    "schemas_loaded": 0,
+    "tables_loaded": 0,
+}
+
+
+# ============================================================
 # Global database manager
 # ============================================================
 
@@ -995,6 +1308,125 @@ async def root():
         "schemas": [s['name'] for s in db_manager.get_schemas()],
         "total_schemas": len(db_manager.get_schemas()),
         "total_tables": db_manager.total_tables,
+    }
+
+
+
+# ============================================================
+# LIVE POSTGRESQL CONNECTION — API Endpoints
+# ============================================================
+
+@app.post("/api/db-connection/test")
+async def test_db_connection(config: DBConnectionConfig):
+    """Test PostgreSQL connection without saving credentials."""
+    result = pg_fetcher.test_connection(config)
+    return result
+
+
+@app.post("/api/db-connection/save")
+async def save_db_connection(config: DBConnectionConfig):
+    """Encrypt and save PostgreSQL credentials locally."""
+    try:
+        credential_manager.save(config)
+        return {
+            "success": True,
+            "message": f"Credentials saved for {config.username}@{config.host}:{config.port}/{config.database}",
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save credentials: {e}")
+
+
+@app.get("/api/db-connection/status")
+async def get_db_connection_status():
+    """Return current connection configuration and last refresh info."""
+    return DBConnectionStatus(
+        configured=credential_manager.is_configured(),
+        last_refresh=_db_connection_status.get("last_refresh"),
+        source=_db_connection_status.get("source", "cache"),
+        host_masked=credential_manager.host_masked(),
+        database=credential_manager.database_name(),
+        schemas_loaded=_db_connection_status.get("schemas_loaded", 0),
+        tables_loaded=_db_connection_status.get("tables_loaded", 0),
+    )
+
+
+@app.delete("/api/db-connection/clear")
+async def clear_db_connection():
+    """Delete saved credentials from disk."""
+    credential_manager.clear()
+    return {"success": True, "message": "Credentials cleared"}
+
+
+@app.post("/api/refresh-schema")
+async def refresh_schema_from_live_db():
+    """
+    Connect to PostgreSQL, fetch live schema, hot-reload in memory,
+    and overwrite metadata.json cache. Connection is closed immediately after.
+    """
+    global _db_connection_status
+
+    config = credential_manager.load()
+    if not config:
+        raise HTTPException(
+            status_code=400,
+            detail="No database credentials configured. Please set up your connection in DB Settings first."
+        )
+
+    logger.info(f"Starting live schema refresh from {config.host}:{config.port}/{config.database}")
+
+    try:
+        schema_data = pg_fetcher.fetch_schema(config)
+    except Exception as e:
+        err = str(e)
+        if "timeout" in err.lower() or "could not connect" in err.lower():
+            raise HTTPException(
+                status_code=503,
+                detail=f"Cannot reach server ({config.host}:{config.port}). Is FortiClient VPN active? Original error: {err}"
+            )
+        raise HTTPException(status_code=500, detail=f"Schema fetch failed: {err}")
+
+    if not schema_data:
+        raise HTTPException(status_code=500, detail="No schemas found. Check that the DB user has access to the schemas.")
+
+    # Count totals
+    total_tables = sum(len(tables) for tables in schema_data.values())
+    total_schemas = len(schema_data)
+
+    # Save to metadata.json as cache
+    target_path = db_manager.json_file_path or get_resource_path(os.path.join("db_files", "metadata.json"))
+    try:
+        # Backup existing file
+        if os.path.exists(target_path):
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup = target_path.replace("metadata.json", f"metadata_backup_{ts}.json")
+            shutil.copy2(target_path, backup)
+            logger.info(f"Backed up existing schema to {backup}")
+        with open(target_path, "w", encoding="utf-8") as f:
+            json.dump(schema_data, f, ensure_ascii=False, indent=2)
+        logger.info(f"Schema saved to {target_path}")
+    except Exception as e:
+        logger.warning(f"Could not write metadata.json: {e}")
+
+    # Hot-reload in memory
+    db_manager.load_schema_from_json(target_path)
+    db_manager.init_database()
+
+    # Update status
+    _db_connection_status = {
+        "last_refresh": datetime.now().isoformat(),
+        "source": "live",
+        "schemas_loaded": total_schemas,
+        "tables_loaded": total_tables,
+    }
+
+    logger.info(f"Live schema refresh complete: {total_schemas} schemas, {total_tables} tables")
+
+    return {
+        "success": True,
+        "schemas_loaded": total_schemas,
+        "tables_loaded": total_tables,
+        "timestamp": _db_connection_status["last_refresh"],
+        "message": f"Schema refreshed from live DB: {total_schemas} schemas, {total_tables} tables loaded",
     }
 
 

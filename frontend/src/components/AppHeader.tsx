@@ -1,8 +1,10 @@
-import { useState, useEffect } from "react";
-import { HelpCircle, RotateCcw, CheckCircle, XCircle, Moon, Sun, History, Wifi, Database } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { HelpCircle, RotateCcw, CheckCircle, XCircle, Moon, Sun, History, Wifi, Database, RefreshCw, Settings2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/components/theme-provider";
 import { SchemaUploadModal } from "./SchemaUploadModal";
+import { DBConnectionModal } from "./DBConnectionModal";
+import { dbConnection, type DBConnectionStatus } from "@/lib/api";
 
 interface AppHeaderProps {
   sessionId: string | null;
@@ -14,8 +16,13 @@ interface AppHeaderProps {
 const AppHeader = ({ sessionId, onHelpOpen, onClearAll, onHistoryOpen }: AppHeaderProps) => {
   const [apiStatus, setApiStatus] = useState<"checking" | "online" | "offline">("checking");
   const [schemaModalOpen, setSchemaModalOpen] = useState(false);
+  const [dbModalOpen, setDbModalOpen] = useState(false);
   const { theme, setTheme } = useTheme();
 
+  const [dbStatus, setDbStatus] = useState<DBConnectionStatus | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Poll API health
   useEffect(() => {
     const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
     const check = async () => {
@@ -35,11 +42,101 @@ const AppHeader = ({ sessionId, onHelpOpen, onClearAll, onHistoryOpen }: AppHead
     return () => clearInterval(interval);
   }, []);
 
+  // Load DB connection status
+  const fetchDbStatus = useCallback(async () => {
+    try {
+      const s = await dbConnection.status();
+      setDbStatus(s);
+    } catch {
+      // backend might not be running yet
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDbStatus();
+    const interval = setInterval(fetchDbStatus, 30000);
+    return () => clearInterval(interval);
+  }, [fetchDbStatus]);
+
+  // Quick refresh from header button
+  const handleQuickRefresh = async () => {
+    if (!dbStatus?.configured) {
+      setDbModalOpen(true);
+      return;
+    }
+    setIsRefreshing(true);
+    try {
+      await dbConnection.refresh();
+      await fetchDbStatus();
+      window.location.reload();
+    } catch {
+      setDbModalOpen(true);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // DB status badge (clickable pill)
+  const DbStatusBadge = () => {
+    if (!dbStatus) return null;
+    const isLive = dbStatus.source === "live";
+    const isCached = dbStatus.configured && dbStatus.source === "cache";
+
+    return (
+      <button
+        onClick={() => setDbModalOpen(true)}
+        title="Database Connection Settings"
+        className="hidden md:flex items-center gap-1.5 text-xs rounded-full px-3 py-1.5 font-medium transition-all hover:opacity-80"
+        style={{
+          background: isLive
+            ? "hsl(142 70% 35% / 0.25)"
+            : isCached
+            ? "hsl(216 80% 50% / 0.2)"
+            : "hsl(0 0% 100% / 0.08)",
+          border: `1px solid ${
+            isLive
+              ? "hsl(142 70% 50% / 0.5)"
+              : isCached
+              ? "hsl(216 60% 55% / 0.5)"
+              : "hsl(216 60% 35%)"
+          }`,
+        }}
+      >
+        <div
+          className={`h-2 w-2 rounded-full ${isLive ? "animate-pulse" : ""}`}
+          style={{
+            background: isLive
+              ? "hsl(142 70% 50%)"
+              : isCached
+              ? "hsl(216 80% 60%)"
+              : "hsl(0 0% 50%)",
+          }}
+        />
+        <span
+          style={{
+            color: isLive
+              ? "hsl(142 70% 75%)"
+              : isCached
+              ? "hsl(216 80% 80%)"
+              : "hsl(0 0% 65%)",
+          }}
+        >
+          {isLive
+            ? `${dbStatus.database} · Live`
+            : isCached
+            ? `${dbStatus.database} · Cache`
+            : "No DB"}
+        </span>
+      </button>
+    );
+  };
+
   return (
     <header
       className="sticky top-0 z-50 shadow-lg"
       style={{
-        background: "linear-gradient(135deg, hsl(216,100%,20%) 0%, hsl(216,100%,28%) 60%, hsl(216,90%,32%) 100%)",
+        background:
+          "linear-gradient(135deg, hsl(216,100%,20%) 0%, hsl(216,100%,28%) 60%, hsl(216,90%,32%) 100%)",
         borderBottom: "3px solid hsl(357,71%,46%)",
       }}
     >
@@ -47,8 +144,6 @@ const AppHeader = ({ sessionId, onHelpOpen, onClearAll, onHistoryOpen }: AppHead
 
         {/* ── KRC Official Logo + App Title ── */}
         <div className="flex items-center gap-3 min-w-0">
-
-          {/* Logo inside white pill — preserves original logo colors */}
           <div
             className="flex-shrink-0 flex items-center justify-center rounded-lg px-2 py-1"
             style={{ background: "white", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" }}
@@ -61,13 +156,8 @@ const AppHeader = ({ sessionId, onHelpOpen, onClearAll, onHistoryOpen }: AppHead
             />
           </div>
 
-          {/* Divider */}
-          <div
-            className="hidden sm:block w-px h-10 opacity-25"
-            style={{ background: "white" }}
-          />
+          <div className="hidden sm:block w-px h-10 opacity-25" style={{ background: "white" }} />
 
-          {/* App subtitle */}
           <div className="hidden sm:block min-w-0">
             <h1 className="text-sm font-bold text-white tracking-tight truncate leading-tight">
               SQL Query Generator
@@ -100,6 +190,30 @@ const AppHeader = ({ sessionId, onHelpOpen, onClearAll, onHistoryOpen }: AppHead
             )}
           </div>
 
+          {/* DB Connection Status Badge */}
+          <DbStatusBadge />
+
+          {/* Refresh Schema button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleQuickRefresh}
+            disabled={isRefreshing}
+            title={
+              dbStatus?.configured
+                ? "Refresh live schema from PostgreSQL"
+                : "Configure DB connection first"
+            }
+            className="text-xs gap-1.5 font-medium text-slate-200 hover:text-white hover:bg-white/10 hidden sm:flex"
+          >
+            {isRefreshing ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <RefreshCw className="h-3.5 w-3.5" />
+            )}
+            <span className="hidden lg:inline">Refresh Schema</span>
+          </Button>
+
           {/* Session badge */}
           {sessionId && (
             <div
@@ -116,14 +230,17 @@ const AppHeader = ({ sessionId, onHelpOpen, onClearAll, onHistoryOpen }: AppHead
           )}
 
           <Button
-            variant="ghost" size="sm" onClick={onClearAll}
+            variant="ghost"
+            size="sm"
+            onClick={onClearAll}
             className="text-xs gap-1.5 font-medium text-slate-200 hover:text-white hover:bg-white/10"
           >
             <RotateCcw className="h-3.5 w-3.5" /> Reset
           </Button>
 
           <Button
-            variant="ghost" size="icon"
+            variant="ghost"
+            size="icon"
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
             title="Toggle dark/light mode"
             className="text-slate-200 hover:text-white hover:bg-white/10"
@@ -132,23 +249,41 @@ const AppHeader = ({ sessionId, onHelpOpen, onClearAll, onHistoryOpen }: AppHead
           </Button>
 
           <Button
-            variant="ghost" size="icon" onClick={onHistoryOpen}
+            variant="ghost"
+            size="icon"
+            onClick={onHistoryOpen}
             title="Query History"
             className="text-slate-200 hover:text-white hover:bg-white/10"
           >
             <History className="h-4 w-4" />
           </Button>
 
+          {/* DB Connection Settings */}
           <Button
-            variant="ghost" size="icon" onClick={() => setSchemaModalOpen(true)}
-            title="Update Database Schema"
+            variant="ghost"
+            size="icon"
+            onClick={() => setDbModalOpen(true)}
+            title="Database Connection Settings"
+            className="text-slate-200 hover:text-white hover:bg-white/10"
+          >
+            <Settings2 className="h-4 w-4" />
+          </Button>
+
+          {/* Manual schema upload */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setSchemaModalOpen(true)}
+            title="Upload Schema JSON manually"
             className="text-slate-200 hover:text-white hover:bg-white/10"
           >
             <Database className="h-4 w-4" />
           </Button>
 
           <Button
-            variant="ghost" size="icon" onClick={onHelpOpen}
+            variant="ghost"
+            size="icon"
+            onClick={onHelpOpen}
             title="Help Center"
             className="text-slate-200 hover:text-white hover:bg-white/10"
           >
@@ -166,10 +301,16 @@ const AppHeader = ({ sessionId, onHelpOpen, onClearAll, onHistoryOpen }: AppHead
         </div>
       )}
 
-      <SchemaUploadModal 
-        open={schemaModalOpen} 
-        onOpenChange={setSchemaModalOpen} 
-        onSuccess={() => window.location.reload()} 
+      <SchemaUploadModal
+        open={schemaModalOpen}
+        onOpenChange={setSchemaModalOpen}
+        onSuccess={() => window.location.reload()}
+      />
+
+      <DBConnectionModal
+        open={dbModalOpen}
+        onOpenChange={setDbModalOpen}
+        onRefreshComplete={() => window.location.reload()}
       />
     </header>
   );

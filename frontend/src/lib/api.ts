@@ -139,3 +139,63 @@ export const api = {
       body: JSON.stringify({ queries, operation, wrap_in_cte: wrapInCte }),
     }),
 };
+
+// ============================================================
+// LIVE POSTGRESQL CONNECTION
+// ============================================================
+
+export interface DBConnectionConfig {
+  host: string;
+  port: number;
+  database: string;
+  username: string;
+  password: string;
+}
+
+export interface DBConnectionStatus {
+  configured: boolean;
+  last_refresh: string | null;
+  source: "live" | "cache" | "none";
+  host_masked: string | null;
+  database: string | null;
+  schemas_loaded: number;
+  tables_loaded: number;
+}
+
+export interface TestConnectionResult {
+  success: boolean;
+  latency_ms?: number;
+  error?: string;
+}
+
+export interface RefreshSchemaResult {
+  success: boolean;
+  schemas_loaded: number;
+  tables_loaded: number;
+  timestamp: string;
+  message: string;
+}
+
+export const dbConnection = {
+  test: (config: DBConnectionConfig) =>
+    request<TestConnectionResult>("/api/db-connection/test", {
+      method: "POST",
+      body: JSON.stringify(config),
+    }),
+
+  save: (config: DBConnectionConfig) =>
+    request<{ success: boolean; message: string }>("/api/db-connection/save", {
+      method: "POST",
+      body: JSON.stringify(config),
+    }),
+
+  status: () => request<DBConnectionStatus>("/api/db-connection/status"),
+
+  clear: () =>
+    request<{ success: boolean; message: string }>("/api/db-connection/clear", {
+      method: "DELETE",
+    }),
+
+  refresh: () =>
+    request<RefreshSchemaResult>("/api/refresh-schema", { method: "POST" }),
+};
