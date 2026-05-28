@@ -125,10 +125,13 @@ const Index = () => {
         (a) => `${a.func}(${a.column})${a.alias ? ` AS ${a.alias}` : ""}`
       );
     }
-    // selectedColumns with aliases
+    // selectedColumns with aliases AND optional CAST
     const colParts = selectedColumns.map((c) => {
       const alias = columnAliases[c];
-      return alias ? `${c} AS ${alias}` : c;
+      const cast = columnCasts[c];
+      let ref = c;
+      if (cast) ref = `CAST(${c} AS ${cast})`;
+      return alias ? `${ref} AS ${alias}` : ref;
     });
     const colList = colParts.length > 0
       ? colParts.join(", ")
@@ -222,7 +225,7 @@ const Index = () => {
     if (offset) q += `\nOFFSET ${offset}`;
 
     return q;
-  }, [queryType, rawSql, selectedTables, selectedColumns, columnAliases, conditions, joins, aggregates, dateColumn, dateFrom, dateTo, groupBy, orderBy, limit, offset, distinct, having, caseExpressions, functionColumns, windowFunctions]);
+  }, [queryType, rawSql, selectedTables, selectedColumns, columnAliases, columnCasts, conditions, joins, aggregates, dateColumn, dateFrom, dateTo, groupBy, orderBy, limit, offset, distinct, having, caseExpressions, functionColumns, windowFunctions]);
 
   const handleGenerate = useCallback(async () => {
     if (queryType === "raw") {
@@ -272,11 +275,16 @@ const Index = () => {
               }
               return { table: "", column: c.column, operator: c.operator, value: c.value, logic: c.logic, group_start: c.groupStart ?? false, group_end: c.groupEnd ?? false };
             }),
-          // Inject date range as conditions (Feature 4)
-          ...(queryType === "date_range" && dateColumn ? [
-            ...(dateFrom ? [{ table: dateColumn.split(".")[0] || "", column: dateColumn.split(".").pop() || dateColumn, operator: ">=", value: `'${dateFrom}'`, logic: "AND" as const }] : []),
-            ...(dateTo ? [{ table: dateColumn.split(".")[0] || "", column: dateColumn.split(".").pop() || dateColumn, operator: "<=", value: `'${dateTo}'`, logic: "AND" as const }] : []),
-          ] : []),
+          // Inject date range as conditions — value WITHOUT quotes, backend formats by type
+          ...(queryType === "date_range" && dateColumn ? (() => {
+            const hasDot = dateColumn.includes(".");
+            const tbl = hasDot ? dateColumn.split(".")[0] : "";
+            const col = hasDot ? dateColumn.split(".").slice(1).join(".") : dateColumn;
+            return [
+              ...(dateFrom ? [{ table: tbl, column: col, operator: ">=", value: dateFrom, logic: "AND" as const, group_start: false, group_end: false }] : []),
+              ...(dateTo   ? [{ table: tbl, column: col, operator: "<=", value: dateTo,   logic: "AND" as const, group_start: false, group_end: false }] : []),
+            ];
+          })() : []),
         ],
 
         // Joins with multi-ON conditions + operators

@@ -130,7 +130,7 @@ const ConditionBuilder = ({ tables, conditions, onConditionsChange }: ConditionB
           ? cond.value.split(" AND ")
           : [];
         const betweenStart = betweenParts[0] ?? "";
-        const betweenEnd = betweenParts[1] ?? "";
+        const betweenEnd = betweenParts[1] ?? "";   // must default to "" not undefined
 
         return (
           <div key={cond.id} className="space-y-1">

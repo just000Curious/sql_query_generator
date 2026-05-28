@@ -4,6 +4,7 @@ SQL Query Generator API with Schema-Based Navigation
 """
 
 import os
+import re
 import sys
 import sqlite3
 import json
@@ -487,7 +488,9 @@ class SchemaDatabaseManager:
                 for table_name, table_info in schema_tables.items():
                     self.schemas[schema_name][table_name] = {
                         'columns': table_info.get('columns', []),
-                        'keys': table_info.get('keys', {})
+                        'keys': table_info.get('keys', {}),
+                        # *** FIX: preserve column_types if present (live feed enriches this) ***
+                        'column_types': table_info.get('column_types', {}),
                     }
                     self.total_tables += 1
 
@@ -530,14 +533,21 @@ class SchemaDatabaseManager:
         return self.connection
 
     def _infer_data_type(self, column_name: str) -> str:
-        """Infer SQLite data type from column name"""
+        """Infer data type from column name — used only when column_types is absent.
+        Returns lowercase type string to match PostgreSQL conventions."""
         col_lower = column_name.lower()
-
-        if any(x in col_lower for x in ['date', 'dt', 'timestamp']):
-            return 'DATE'
-        if any(x in col_lower for x in ['no', 'num', 'count', 'qty', 'amount', 'amt']):
-            return 'NUMERIC'
-        return 'TEXT'
+        # Date/time: must contain 'date', 'dt' standalone, or 'timestamp'
+        if any(col_lower == x or col_lower.endswith('_' + x) or col_lower.startswith(x + '_')
+               for x in ['date', 'dt', 'timestamp']):
+            return 'date'
+        if 'timestamp' in col_lower:
+            return 'timestamp'
+        # Numeric: only whole-word numeric suffixes — avoid matching 'no' in every column
+        NUMERIC_SUFFIXES = {'_qty', '_count', '_cnt', '_amt', '_amount', '_num', '_id',
+                            '_seq', '_rate', '_price', '_cost', '_total', '_pct', '_percent'}
+        if any(col_lower.endswith(sfx) for sfx in NUMERIC_SUFFIXES):
+            return 'integer'
+        return 'text'
 
     def get_schemas(self) -> List[Dict]:
         """Get all schemas with counts"""
@@ -1286,12 +1296,11 @@ def _build_sql_from_request(request: GenerateRequest) -> str:
             formatted_items = [helper._format_value(v.strip(), ct) for v in raw_items]
             clause = f"{ref} {op} ({', '.join(formatted_items)})"
         elif op == "BETWEEN":
-            # Expect "start AND end" or "start,end"
-            raw = str(cond.value)
-            if " AND " in raw.upper():
-                parts = raw.upper().split(" AND ", 1)
-                start = raw[:len(parts[0])]
-                end = raw[len(parts[0]) + 5:]
+            # Expect "start AND end" (any case) or "start,end"
+            raw = str(cond.value).strip()
+            and_match = re.split(r'\s+and\s+', raw, maxsplit=1, flags=re.IGNORECASE)
+            if len(and_match) == 2:
+                start, end = and_match[0].strip(), and_match[1].strip()
             elif "," in raw:
                 parts2 = raw.split(",", 1)
                 start, end = parts2[0].strip(), parts2[1].strip()
@@ -1936,13 +1945,17 @@ async def get_tables_flat(schema: str = Query(None, description="Schema name e.g
 
 @app.get("/tables/{table_name}/columns")
 async def get_table_columns(table_name: str, schema: str = Query(..., description="Schema name")):
-    """Get columns, PKs and FKs for a table — frontend-compatible format"""
+    """Get columns, PKs and FKs for a table — frontend-compatible format.
+    Returns real column types from column_types (live feed) or inferred types as fallback.
+    """
     try:
         table_info = db_manager.get_table_info(schema, table_name)
+        # Prefer real column_types from schema metadata; fall back to name heuristic
+        real_types: dict = db_manager.schemas.get(schema, {}).get(table_name, {}).get('column_types', {})
         columns = [
             {
                 "name": c,
-                "type": db_manager._infer_data_type(c),
+                "type": real_types.get(c) or db_manager._infer_data_type(c),
                 "is_primary_key": c in table_info['primary_keys']
             }
             for c in table_info['columns']
