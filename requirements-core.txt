@@ -1,5 +1,0 @@
-pypika
-pandas
-sqlparse
-openpyxl
-xlrd
