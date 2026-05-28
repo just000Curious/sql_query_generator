@@ -1,0 +1,9 @@
+fastapi>=0.115.0
+uvicorn>=0.30.0
+pydantic>=2.10.0
+python-multipart>=0.0.12
+pandas>=2.2.0
+openpyxl>=3.1.5
+pyinstaller>=6.0.0
+psycopg2-binary>=2.9.0
+cryptography>=42.0.0

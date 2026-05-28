@@ -12,6 +12,16 @@
 
 ---
 
+## 📸 Screenshots
+
+### 🖥️ Interactive Visual Query Builder
+![Interactive Visual Query Builder](screenshots/homepage.png)
+
+### ⚙️ Database Connection Settings
+![Database Connection Settings](screenshots/db_connection_modal.png)
+
+---
+
 ## 📋 Table of Contents
 
 - [Features](#-features)
