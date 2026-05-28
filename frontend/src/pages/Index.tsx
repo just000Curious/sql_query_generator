@@ -14,7 +14,6 @@ import TempTableOptions from "@/components/TempTableOptions";
 import ValidationPanel from "@/components/ValidationPanel";
 import HelpModal from "@/components/HelpModal";
 import { HistoryPanel } from "@/components/HistoryPanel";
-import ResultsPanel from "@/components/ResultsPanel";
 import HavingBuilder, { type HavingCondition } from "@/components/HavingBuilder";
 import CaseExpressionBuilder, { type CaseExpression, buildCaseSql } from "@/components/CaseExpressionBuilder";
 import FunctionBuilder, { type FunctionColumn, buildFuncSql } from "@/components/FunctionBuilder";
@@ -43,7 +42,7 @@ const Index = () => {
   const [dateTo, setDateTo] = useState("");
   const [groupBy, setGroupBy] = useState<string[]>([]);
   const [orderBy, setOrderBy] = useState<{ column: string; direction: "ASC" | "DESC" }[]>([]);
-  const [limit, setLimit] = useState(100);
+  const [limit, setLimit] = useState<number | undefined>(undefined);
   const [offset, setOffset] = useState(0);
   const [rawSql, setRawSql] = useState("");
   const [distinct, setDistinct] = useState(false);
@@ -62,14 +61,6 @@ const Index = () => {
   const [generating, setGenerating] = useState(false);
   const [executing, setExecuting] = useState(false);
 
-  // Execute / Results state
-  const [executeResults, setExecuteResults] = useState<{
-    data: Record<string, unknown>[];
-    columns: string[];
-    rowCount: number;
-    executionTime: number;
-    hasResults: boolean;
-  }>({ data: [], columns: [], rowCount: 0, executionTime: 0, hasResults: false });
   const [runningQuery, setRunningQuery] = useState(false);
 
   // Init session
@@ -103,7 +94,7 @@ const Index = () => {
     setDateTo("");
     setGroupBy([]);
     setOrderBy([]);
-    setLimit(100);
+    setLimit(undefined);
     setOffset(0);
     setRawSql("");
     setSql("");
@@ -319,7 +310,7 @@ const Index = () => {
           table: "", column: h.expression, operator: h.operator, value: h.value,
         })),
 
-        limit: limit || undefined,
+        limit: limit ?? undefined,
         offset: offset || undefined,
         order_by: orderBy.filter((o) => o.column).map((o) => ({ column: o.column, direction: o.direction })),
         group_by: groupBy,
@@ -358,35 +349,6 @@ const Index = () => {
       toast.info("✅ SQL generated — copy the query and run it manually on your PostgreSQL server");
     } finally {
       setExecuting(false);
-    }
-  }, [displaySql, sql]);
-
-  const handleExecute = useCallback(async () => {
-    const target = displaySql || sql;
-    if (!target) return;
-    setRunningQuery(true);
-    addToHistory(target);
-    try {
-      const res = await api.executeQuery(target, 1000);
-      if (res.success) {
-        setExecuteResults({
-          data: res.data,
-          columns: res.columns,
-          rowCount: res.row_count,
-          executionTime: res.execution_time,
-          hasResults: true,
-        });
-        toast.success(`✅ Query returned ${res.row_count} row${res.row_count !== 1 ? "s" : ""} in ${res.execution_time.toFixed(3)}s`);
-        // Scroll to results
-        setTimeout(() => document.getElementById("results-panel")?.scrollIntoView({ behavior: "smooth" }), 100);
-      } else {
-        toast.error("Query returned an error — check the SQL syntax");
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      toast.error(`Execution failed: ${msg}`);
-    } finally {
-      setRunningQuery(false);
     }
   }, [displaySql, sql]);
 
@@ -845,29 +807,8 @@ const Index = () => {
                 sql={previewSql}
                 onValidate={handleValidate}
                 validating={executing}
-                onExecute={handleExecute}
-                executing={runningQuery}
               />
             </SectionCard>
-
-            {/* Results Panel — shown after Execute */}
-            {executeResults.hasResults && (
-              <SectionCard
-                title="Query Results"
-                icon="📊"
-                hint={`${executeResults.rowCount} rows · ${executeResults.executionTime.toFixed(3)}s`}
-              >
-                <div id="results-panel">
-                  <ResultsPanel
-                    data={executeResults.data}
-                    columns={executeResults.columns}
-                    rowCount={executeResults.rowCount}
-                    executionTime={executeResults.executionTime}
-                    hasResults={executeResults.hasResults}
-                  />
-                </div>
-              </SectionCard>
-            )}
 
             {/* Temp Table / CTE — its own card so it's always visible */}
             <SectionCard

@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Copy, CheckCircle, Download, Loader2, ClipboardCheck, Play } from "lucide-react";
+import { Copy, CheckCircle, Download, Loader2, ClipboardCheck } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
 
@@ -7,11 +7,9 @@ interface SqlPreviewProps {
   sql: string;
   onValidate: () => void;
   validating: boolean;
-  onExecute?: () => void;
-  executing?: boolean;
 }
 
-const SqlPreview = ({ sql, onValidate, validating, onExecute, executing }: SqlPreviewProps) => {
+const SqlPreview = ({ sql, onValidate, validating }: SqlPreviewProps) => {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -109,22 +107,6 @@ const SqlPreview = ({ sql, onValidate, validating, onExecute, executing }: SqlPr
           )}
         </Button>
 
-        {onExecute && (
-          <Button
-            id="run-preview-btn"
-            size="sm"
-            onClick={onExecute}
-            disabled={!sql || executing}
-            className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-sm"
-            title="Run query against the connected database and preview results inline"
-          >
-            {executing
-              ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Running…</>
-              : <><Play className="h-3.5 w-3.5" /> Run &amp; Preview Results</>
-            }
-          </Button>
-        )}
-
         <Button
           variant="outline"
           size="sm"
@@ -155,10 +137,7 @@ const SqlPreview = ({ sql, onValidate, validating, onExecute, executing }: SqlPr
         <p className="text-xs text-muted-foreground flex items-center gap-1.5 bg-muted/50 px-3 py-2 rounded-lg border border-border/60">
           <span>💡</span>
           <span>
-            {onExecute
-              ? <>Click <strong>Run &amp; Preview Results</strong> to execute against the database inline, or <strong>Copy SQL</strong> for your PostgreSQL client.</>
-              : <>Click <strong>Copy SQL</strong>, then paste and run it in your PostgreSQL client (pgAdmin, DBeaver, psql, etc.)</>
-            }
+            Click <strong>Copy SQL</strong>, then paste and run it in your PostgreSQL client (pgAdmin, DBeaver, psql, etc.)
           </span>
         </p>
       )}

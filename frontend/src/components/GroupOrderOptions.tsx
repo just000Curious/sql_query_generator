@@ -16,8 +16,8 @@ interface GroupOrderOptionsProps {
   onGroupByChange: (g: string[]) => void;
   orderBy: OrderByItem[];
   onOrderByChange: (o: OrderByItem[]) => void;
-  limit: number;
-  onLimitChange: (n: number) => void;
+  limit: number | undefined;
+  onLimitChange: (n: number | undefined) => void;
   offset: number;
   onOffsetChange: (n: number) => void;
   showGroupBy?: boolean;
@@ -110,8 +110,19 @@ const GroupOrderOptions = ({
       <div className={showGroupBy ? "md:col-span-2" : ""}>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label className="text-xs text-muted-foreground">Limit</Label>
-            <Input type="number" min={0} max={10000} value={limit} onChange={(e) => onLimitChange(Number(e.target.value))} className="h-10 mt-1" />
+            <Label className="text-xs text-muted-foreground">Limit <span className="font-normal italic">(optional)</span></Label>
+            <Input
+              type="number"
+              min={1}
+              max={100000}
+              placeholder="No limit"
+              value={limit ?? ""}
+              onChange={(e) => {
+                const val = e.target.value;
+                onLimitChange(val === "" ? undefined : Number(val));
+              }}
+              className="h-10 mt-1"
+            />
           </div>
           <div>
             <Label className="text-xs text-muted-foreground">Offset</Label>
