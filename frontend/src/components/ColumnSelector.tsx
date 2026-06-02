@@ -8,7 +8,7 @@ import type { SelectedTable } from "@/components/TableSelector";
 
 // All SQL CAST targets that are commonly used
 const CAST_OPTIONS = [
-  { value: "", label: "— no cast —" },
+  { value: "none", label: "— no cast —" },
   { value: "VARCHAR", label: "VARCHAR (text)" },
   { value: "TEXT", label: "TEXT" },
   { value: "CHAR(10)", label: "CHAR" },
@@ -99,7 +99,7 @@ const ColumnSelector = ({
   const updateCast = (colKey: string, castVal: string) => {
     if (onColumnCastsChange) {
       const next = { ...columnCasts };
-      if (castVal) {
+      if (castVal && castVal !== "none") {
         next[colKey] = castVal;
       } else {
         delete next[colKey];
@@ -233,7 +233,7 @@ const ColumnSelector = ({
                 {isSelected && editingCast === col.key && onColumnCastsChange && (
                   <div className="flex items-center gap-1 mt-0.5 ml-6">
                     <ArrowRightLeft className="h-2.5 w-2.5 text-orange-500 flex-shrink-0" />
-                    <Select value={cast || ""} onValueChange={(v) => { updateCast(col.key, v); setEditingCast(null); }}>
+                    <Select value={cast || "none"} onValueChange={(v) => { updateCast(col.key, v); setEditingCast(null); }}>
                       <SelectTrigger className="h-6 text-[10px] flex-1">
                         <SelectValue placeholder="Select type…" />
                       </SelectTrigger>

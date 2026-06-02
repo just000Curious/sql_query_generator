@@ -56,32 +56,23 @@ const HelpModal = ({ open, onOpenChange }: HelpModalProps) => (
         {/* ── GETTING STARTED ── */}
         <TabsContent value="start" className="space-y-5 mt-0">
           <div className="rounded-xl p-4 border space-y-4" style={{ background: "hsl(24 89% 53% / 0.05)", borderColor: "hsl(24 89% 53% / 0.2)" }}>
-            <p className="text-sm font-semibold" style={{ color: "hsl(24 89% 55%)" }}>Follow these 5 steps to build your first query:</p>
+            <p className="text-sm font-semibold" style={{ color: "hsl(24 89% 55%)" }}>Welcome! Follow these simple steps to build your first query without writing any code:</p>
             <div className="space-y-3">
-              <Step n={1} title="Choose a Query Type" desc="Pick Simple SELECT for basic queries, JOIN to combine tables, Aggregate for COUNT/SUM/AVG, Date Range for time-based filters, or Raw SQL to write your own." />
-              <Step n={2} title="Select Schema → Table → Columns" desc="Choose a logical schema (GM, HM, PM, SA, SI, TA), search and pick a table, then tick the columns you need. Leave all unticked to generate SELECT *." />
-              <Step n={3} title="Add WHERE Filters (optional)" desc="Click 'Add WHERE Condition', choose a column — date columns show a date picker automatically, text columns show a text input. Combine multiple conditions with AND / OR." />
-              <Step n={4} title="Type Casting (optional)" desc="Click the CAST button next to any selected column to convert its output type (e.g. date → VARCHAR, numeric → TEXT). The SQL will wrap it in CAST(column AS type)." />
-              <Step n={5} title="Generate → Copy or Run" desc="Click 'Generate SQL Query' (or Ctrl+Enter). Copy the SQL to paste into pgAdmin / DBeaver, or click 'Run & Preview Results' to execute it directly against the live database." />
+              <Step n={1} title="Choose what you want to do" desc="At the top, select 'Simple SELECT' if you just want to view data from one table. Choose 'JOIN' if you need data from multiple tables together. Choose 'Aggregate' if you want to calculate totals or averages." />
+              <Step n={2} title="Pick your Table(s) and Columns" desc="Select a category (like 'PM' for Personnel), pick a table from the dropdown, and check the boxes next to the columns you want to see. You can pick multiple tables using the dropdown." />
+              <Step n={3} title="Filter the data (Optional)" desc="Don't want to see everything? Click 'Add WHERE Condition' to narrow things down. For example, show only rows where 'status' = 'Active'." />
+              <Step n={4} title="Generate and Run" desc="Click the big 'Generate SQL Query' button. We'll write the SQL for you! You can copy it, or test it by clicking 'Run & Preview Results'." />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3 text-xs">
             <div className="rounded-lg p-3 border border-border/60 bg-muted/30">
-              <p className="font-semibold mb-1">💡 No schema prefix needed</p>
-              <p className="text-muted-foreground">All KRC tables live in the PostgreSQL <Tag>public</Tag> schema. The logical groupings GM / HM / PM / SA / SI / TA are based on the first 2 letters of each table name — no schema prefix is needed in generated SQL.</p>
+              <p className="font-semibold mb-1">💡 Adding Multiple Tables</p>
+              <p className="text-muted-foreground">You can add as many tables as you want by just choosing another table from the Table dropdown. If you do this in 'Simple SELECT' mode, it will combine all rows together (a CROSS JOIN).</p>
             </div>
             <div className="rounded-lg p-3 border border-border/60 bg-muted/30">
-              <p className="font-semibold mb-1">🔑 PK / FK indicators</p>
-              <p className="text-muted-foreground">Columns marked <Tag>PK</Tag> are primary keys. <Tag>FK</Tag> are foreign keys. Always include PK/FK columns in JOIN ON conditions for correct results.</p>
-            </div>
-            <div className="rounded-lg p-3 border border-border/60 bg-muted/30">
-              <p className="font-semibold mb-1">🔁 Live Schema Refresh</p>
-              <p className="text-muted-foreground">Click the <strong>Refresh Schema</strong> button in the header after configuring the DB connection. The tool will pull real column types from PostgreSQL, improving date / numeric handling.</p>
-            </div>
-            <div className="rounded-lg p-3 border border-border/60 bg-muted/30">
-              <p className="font-semibold mb-1">🗂️ Wrap as CTE / Temp Table</p>
-              <p className="text-muted-foreground">After generating, use the Wrap card to convert your query into a <Tag>WITH cte AS (…)</Tag> or <Tag>CREATE TEMP TABLE</Tag> block for use in longer scripts.</p>
+              <p className="font-semibold mb-1">📅 Smart Dates</p>
+              <p className="text-muted-foreground">When filtering on a date column, the system will automatically show you a calendar picker so you don't have to guess the date format.</p>
             </div>
           </div>
         </TabsContent>
@@ -131,11 +122,11 @@ const HelpModal = ({ open, onOpenChange }: HelpModalProps) => (
         {/* ── QUERY TYPES ── */}
         <TabsContent value="types" className="space-y-4 mt-0">
           {[
-            { icon: "📋", name: "Simple SELECT", desc: "Fetch rows from a single table. Choose columns, add WHERE filters, set ORDER BY, and limit results. Best for straightforward lookups against one table.", eg: "SELECT emp_no, emp_name\nFROM pmt_employee\nWHERE dept_code = 'TE'\nORDER BY emp_no\nLIMIT 50" },
-            { icon: "🔗", name: "JOIN", desc: "Combine two or more tables. Select both tables, choose join type (INNER / LEFT / RIGHT / FULL), then define the ON condition by picking matching columns from each table. Add SELECT columns from any joined table.", eg: "SELECT e.emp_no, e.emp_firstname, i.policy_no\nFROM pmt_employee e\nINNER JOIN pmt_emp_insurance i\n  ON e.emp_no = i.emp_no" },
-            { icon: "📊", name: "Aggregate", desc: "Summarise data with COUNT, SUM, AVG, MIN, MAX. Pick the aggregate function and target column. Add GROUP BY to segment results, and HAVING to filter groups.", eg: "SELECT dept_code, COUNT(*) AS total_employees\nFROM pmt_employee\nGROUP BY dept_code\nHAVING COUNT(*) > 10\nORDER BY total_employees DESC" },
-            { icon: "📅", name: "Date Range", desc: "Filter a date column between two dates. Pick the date column from the dropdown, then set From and To using the date pickers (or click shortcuts like 'This Month', 'This Year'). The WHERE clause is generated automatically.", eg: "SELECT emp_no, policy_start_dt\nFROM pmt_emp_insurance\nWHERE policy_start_dt >= '2024-01-01'\n  AND policy_start_dt <= '2024-12-31'" },
-            { icon: "✍️", name: "Raw SQL", desc: "Write your own PostgreSQL SELECT statement directly in the text area. Useful for subqueries, window functions, CTEs, or any query too complex for the visual builder. The system validates and highlights syntax.", eg: "SELECT emp_no,\n       RANK() OVER (PARTITION BY dept_code ORDER BY basic_pay DESC) AS pay_rank\nFROM pmt_salary\nWHERE pay_year = 2024" },
+            { icon: "📋", name: "Simple SELECT", desc: "Use this to just look at data. You pick a table, choose which columns you want to see, and you can filter it down. It's like looking at an Excel sheet.", eg: "Shows a list of employees in a specific department." },
+            { icon: "🔗", name: "JOIN", desc: "Use this when you need data from two different tables at the same time. For example, if one table has Employee Names and another has their Insurance Details.", eg: "Combines the employee list with their insurance policies so you can see both together." },
+            { icon: "📊", name: "Aggregate", desc: "Use this to do math on your data. You can count how many rows there are, sum up numbers, or find averages. Useful for generating reports.", eg: "Shows the total number of employees in each department." },
+            { icon: "📅", name: "Date Range", desc: "A quick way to filter data between two specific dates. Great for finding records created last month or during a specific financial quarter.", eg: "Shows all insurance policies started between Jan 1st and Dec 31st." },
+            { icon: "✍️", name: "Raw SQL", desc: "For advanced users only. If you know how to write SQL code yourself, you can type it in directly here.", eg: "Allows you to bypass the visual builder and write custom database commands." },
           ].map(({ icon, name, desc, eg }) => (
             <div key={name} className="rounded-xl border border-border/60 overflow-hidden">
               <div className="flex items-center gap-2 px-4 py-2.5 font-semibold text-sm" style={{ background: "hsl(24 89% 53% / 0.08)" }}>
@@ -143,7 +134,7 @@ const HelpModal = ({ open, onOpenChange }: HelpModalProps) => (
               </div>
               <div className="px-4 py-3 space-y-2">
                 <p className="text-xs text-muted-foreground">{desc}</p>
-                <pre className="text-[11px] font-mono p-2 rounded bg-muted/60 whitespace-pre-wrap break-all">{eg}</pre>
+                <p className="text-[11px] font-medium p-2 rounded bg-muted/60 text-muted-foreground italic">Example: {eg}</p>
               </div>
             </div>
           ))}

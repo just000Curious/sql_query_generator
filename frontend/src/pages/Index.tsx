@@ -521,7 +521,7 @@ const Index = () => {
                 <TableSelector
                   tables={selectedTables}
                   onTablesChange={setSelectedTables}
-                  multiTable={queryType === "join"}
+                  multiTable={true}
                 />
                 {selectedTables.length > 0 && (
                   <div className="border-t border-border pt-4">

@@ -246,13 +246,12 @@ export const DBConnectionModal = ({
         {/* Test result */}
         {testState !== "idle" && (
           <div
-            className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium ${
-              testState === "ok"
-                ? "bg-green-500/10 text-green-700 border border-green-500/30"
-                : testState === "fail"
+            className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium ${testState === "ok"
+              ? "bg-green-500/10 text-green-700 border border-green-500/30"
+              : testState === "fail"
                 ? "bg-red-500/10 text-red-700 border border-red-500/30"
                 : "bg-blue-500/10 text-blue-700 border border-blue-500/30"
-            }`}
+              }`}
           >
             {testState === "testing" && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             {testState === "ok" && <CheckCircle2 className="h-3.5 w-3.5" />}
@@ -269,11 +268,10 @@ export const DBConnectionModal = ({
         {/* Save result */}
         {saveState !== "idle" && saveState !== "saving" && (
           <div
-            className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium ${
-              saveState === "saved"
-                ? "bg-green-500/10 text-green-700 border border-green-500/30"
-                : "bg-red-500/10 text-red-700 border border-red-500/30"
-            }`}
+            className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium ${saveState === "saved"
+              ? "bg-green-500/10 text-green-700 border border-green-500/30"
+              : "bg-red-500/10 text-red-700 border border-red-500/30"
+              }`}
           >
             {saveState === "saved"
               ? <CheckCircle2 className="h-3.5 w-3.5" />
@@ -285,13 +283,12 @@ export const DBConnectionModal = ({
         {/* Refresh result */}
         {refreshState !== "idle" && (
           <div
-            className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium ${
-              refreshState === "ok"
-                ? "bg-green-500/10 text-green-700 border border-green-500/30"
-                : refreshState === "fail"
+            className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium ${refreshState === "ok"
+              ? "bg-green-500/10 text-green-700 border border-green-500/30"
+              : refreshState === "fail"
                 ? "bg-red-500/10 text-red-700 border border-red-500/30"
                 : "bg-blue-500/10 text-blue-700 border border-blue-500/30"
-            }`}
+              }`}
           >
             {refreshState === "refreshing" && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             {refreshState === "ok" && <CheckCircle2 className="h-3.5 w-3.5" />}

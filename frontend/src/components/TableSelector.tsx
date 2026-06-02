@@ -3,7 +3,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api, type ColumnInfo } from "@/lib/api";
-import { Loader2, Plus, X, Database, Table, CheckCircle } from "lucide-react";
+import { Loader2, Plus, X, Database, Table, CheckCircle, Pencil } from "lucide-react";
 
 export interface SelectedTable {
   id: string;
@@ -30,6 +30,20 @@ const TableSelector = ({ tables, onTablesChange, multiTable = false }: TableSele
   const [curSchema, setCurSchema] = useState("");
   const [curTableList, setCurTableList] = useState<string[]>([]);
   const [tableSearch, setTableSearch] = useState("");
+  const [editingAliasId, setEditingAliasId] = useState<string | null>(null);
+  const [editingAliasVal, setEditingAliasVal] = useState("");
+
+  const renameAlias = (id: string, newAlias: string) => {
+    const trimmed = newAlias.trim().replace(/[^a-zA-Z0-9_]/g, "");
+    if (!trimmed) return; // don't allow empty alias
+    // Check for duplicate aliases
+    const isDuplicate = tables.some((t) => t.id !== id && t.alias === trimmed);
+    if (isDuplicate) return; // don't allow duplicates
+    onTablesChange(
+      tables.map((t) => (t.id === id ? { ...t, alias: trimmed } : t))
+    );
+    setEditingAliasId(null);
+  };
 
   useEffect(() => {
     setLoadingSchemas(true);
@@ -204,18 +218,14 @@ const TableSelector = ({ tables, onTablesChange, multiTable = false }: TableSele
         </div>
       </div>
 
-      {/* Add more tables button (multi-table mode) */}
-      {multiTable && tables.length > 0 && (
-        <Button variant="outline" size="default" className="gap-2 text-sm">
-          <Plus className="h-4 w-4" /> Add Another Table
-        </Button>
-      )}
+      {/* Add more tables button (multi-table mode) has been removed because users can just use the dropdown again */}
 
       {/* Selected tables as cards */}
       {tables.length > 0 && (
         <div className="flex flex-wrap gap-2 pt-1">
           {tables.map((t) => {
             const isLoading = loadingCols[t.id];
+            const isEditing = editingAliasId === t.id;
             return (
               <div
                 key={t.id}
@@ -228,6 +238,32 @@ const TableSelector = ({ tables, onTablesChange, multiTable = false }: TableSele
                 )}
                 <span className="font-semibold text-secondary">{t.schema}.</span>
                 <span className="font-medium">{t.table}</span>
+
+                {/* Editable alias */}
+                {isEditing ? (
+                  <input
+                    autoFocus
+                    value={editingAliasVal}
+                    onChange={(e) => setEditingAliasVal(e.target.value)}
+                    onBlur={() => renameAlias(t.id, editingAliasVal)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") renameAlias(t.id, editingAliasVal);
+                      if (e.key === "Escape") setEditingAliasId(null);
+                    }}
+                    className="w-14 h-6 px-1.5 text-xs font-mono font-bold rounded border border-primary/50 bg-background text-primary outline-none focus:ring-1 focus:ring-primary/40"
+                    maxLength={8}
+                  />
+                ) : (
+                  <span
+                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-mono font-bold bg-primary/10 text-primary cursor-pointer hover:bg-primary/20 transition-colors"
+                    title="Click to rename alias"
+                    onClick={() => { setEditingAliasId(t.id); setEditingAliasVal(t.alias); }}
+                  >
+                    {t.alias}
+                    <Pencil className="h-2.5 w-2.5 opacity-60" />
+                  </span>
+                )}
+
                 {t.columns.length > 0 && (
                   <span className="badge-count">{t.columns.length} cols</span>
                 )}
