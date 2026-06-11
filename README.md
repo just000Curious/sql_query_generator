@@ -25,7 +25,10 @@
 ## 📋 Table of Contents
 
 - [Features](#-features)
+- [How the Project Works](#-how-the-project-works)
 - [Architecture](#-architecture)
+- [How the EXE Was Created](#-how-the-exe-was-created)
+- [What is app.py (Streamlit Testing UI)](#-what-is-apppy-streamlit-testing-ui)
 - [Tech Stack](#-tech-stack)
 - [Prerequisites](#-prerequisites)
 - [Quick Start](#-quick-start)
@@ -60,6 +63,72 @@
 
 ---
 
+## 🔄 How the Project Works
+
+This section explains the **end-to-end flow** of the SQL Query Generator — from user interaction to SQL output.
+
+### Overview
+
+The project is a **client-server application** where:
+- A **React frontend** (the visual query builder) runs in the browser.
+- A **Python/FastAPI backend** runs a REST API that generates SQL queries.
+- The two communicate over HTTP on `localhost`.
+
+### Step-by-Step Flow
+
+```
+ User opens browser                     Backend starts
+      │                                      │
+      ▼                                      ▼
+ React UI loads on                     FastAPI reads db_files/metadata.json
+ http://localhost:5173                 and builds an in-memory SQLite mirror
+      │                                      │
+      ▼                                      ▼
+ User selects Schema ──► GET /schemas ──► Returns list of schemas (GM, PM, etc.)
+      │
+      ▼
+ User selects Table ──► GET /schemas/{name}/tables ──► Returns tables & columns
+      │
+      ▼
+ User picks columns, adds WHERE
+ conditions, JOINs, aggregates, etc.
+      │
+      ▼
+ User clicks "Generate" ──► POST /query/generate ──► Backend assembles SQL
+      │                                                    │
+      ▼                                                    ▼
+ SQL Preview panel shows                            Validates columns exist,
+ the generated query                                checks operator correctness,
+      │                                             returns formatted SQL string
+      ▼
+ User can copy, download, or
+ wrap in CTE / TEMP TABLE
+```
+
+### Key Backend Concepts
+
+1. **Schema Metadata (`db_files/metadata.json`)**
+   - This JSON file contains the full definition of every database schema, table, column, primary key, and foreign key from the Konkan Railway Corporation's PostgreSQL databases.
+   - At startup, `api.py` reads this file and loads it into memory. It also creates a lightweight **in-memory SQLite mirror** so that SQL queries can be syntax-validated without needing access to the real PostgreSQL server.
+
+2. **Query Generation Engine**
+   - When the frontend sends a `POST /query/generate` request with the user's selections (tables, columns, conditions, joins, etc.), the backend's `SchemaQueryGenerator` class builds a properly formatted SQL string.
+   - The engine handles all SQL clauses: `SELECT`, `FROM`, `WHERE`, `JOIN`, `GROUP BY`, `HAVING`, `ORDER BY`, `LIMIT`, `DISTINCT`, computed columns, and `CAST` expressions.
+   - Values are properly quoted based on column types (numeric values are unquoted, strings are escaped and quoted, dates are formatted as `'YYYY-MM-DD'` literals).
+
+3. **Validation**
+   - Before returning SQL, the backend validates the request against the schema metadata — checking that referenced columns actually exist in their tables, join conditions are complete, and operators are valid.
+   - Errors and warnings are returned to the frontend, which displays them in a real-time **Validation Panel**.
+
+4. **Live PostgreSQL Connection (Optional)**
+   - Users can optionally connect the tool to a **live PostgreSQL server** via the Database Connection modal in the UI.
+   - When connected, the tool fetches the live schema directly from `information_schema` and replaces the static `metadata.json` data, ensuring the column list is always up-to-date.
+
+5. **Offline Fallback**
+   - If the backend API is unreachable, the React frontend switches to a **local fallback mode** where it generates basic SQL queries entirely in the browser using JavaScript. A red "API Offline" banner appears to indicate this mode.
+
+---
+
 ## 🏗️ Architecture
 
 ```
@@ -82,6 +151,132 @@
                                                 │  (Schema Definitions)│
                                                 └──────────────────────┘
 ```
+
+---
+
+## 📦 How the EXE Was Created
+
+The standalone `SQL_Query_Generator.exe` in the `dist/` folder is a **single-file executable** (~64 MB) that bundles the **entire application** — Python backend, React frontend, and all dependencies — into one double-clickable file. No Python, Node.js, or any other software needs to be installed on the target machine.
+
+### Tool Used: PyInstaller
+
+[PyInstaller](https://pyinstaller.org/) is used to freeze the Python backend into a standalone executable. It works by:
+1. Analyzing all Python `import` statements starting from `api.py`.
+2. Collecting every Python module, C extension, and shared library into a single archive.
+3. Embedding a Python interpreter so the exe runs without Python being installed.
+
+### What Gets Bundled Inside the EXE
+
+| Bundled Asset | Source Location | Packed Into |
+|---|---|---|
+| **Python runtime** | System Python 3.10+ | Embedded interpreter |
+| **FastAPI + Uvicorn** | `requirements-api.txt` | Frozen Python packages |
+| **React frontend build** | `frontend/dist/` | `frontend/dist/` inside exe |
+| **Schema metadata** | `db_files/metadata.json` | `db_files/` inside exe |
+| **All Python modules** | `api.py`, `query_engine.py`, etc. | Frozen bytecode |
+
+### How the Build Works
+
+There are **two ways** to build the exe:
+
+#### Option 1: Using `package_app.py` (Recommended)
+
+This is a helper script that automates the entire process:
+
+```bash
+python package_app.py
+```
+
+It performs three steps:
+1. **Pre-flight checks** — Verifies that `db_files/metadata.json` and `frontend/dist/` (the React production build) exist. If the frontend hasn't been built yet, it tells you to run `cd frontend && npm install && npm run build` first.
+2. **Runs PyInstaller** — Executes the PyInstaller command with all the correct flags (`--onefile`, `--noconsole`, `--add-data`, and `--hidden-import` for uvicorn/FastAPI internals).
+3. **Reports success** — Shows the exe path and file size.
+
+#### Option 2: Using the `.spec` file directly
+
+```bash
+python -m PyInstaller SQL_Query_Generator.spec --clean
+```
+
+The `SQL_Query_Generator.spec` file is a PyInstaller configuration that defines:
+- **Entry point**: `api.py`
+- **Data files**: `frontend/dist` (React build) and `db_files` (schema metadata)
+- **Icon**: `frontend/public/krc-logo.png`
+- **Mode**: `--onefile` (single exe) + `--noconsole` (no terminal window)
+
+### What Happens When You Run the EXE
+
+1. PyInstaller extracts the bundled files to a temporary directory (`sys._MEIPASS`).
+2. `api.py` detects it's running inside PyInstaller and uses `get_resource_path()` to resolve paths relative to that temp directory.
+3. The FastAPI/Uvicorn server starts on `http://127.0.0.1:8000`.
+4. The browser auto-opens to `http://127.0.0.1:8000` where the React frontend is served.
+5. Crash logs are written to `%USERPROFILE%\SQL_Query_Generator_logs\app.log`.
+
+> **Note:** The `.exe` is a Windows-only binary. It cannot run on Linux or macOS. To create an executable for another OS, you must run PyInstaller on that OS.
+
+### Prerequisites for Building
+
+Before building the exe, you need:
+
+```bash
+# 1. Install PyInstaller
+pip install pyinstaller
+
+# 2. Build the React frontend (creates frontend/dist/)
+cd frontend
+npm install
+npm run build
+cd ..
+
+# 3. Run the packager
+python package_app.py
+```
+
+---
+
+## 🧪 What is `app.py` (Streamlit Testing UI)
+
+`app.py` is a **Streamlit-based testing interface** that was created during early development to quickly test and debug the backend API. It is **not** the main frontend — the main frontend is the React application in the `frontend/` directory.
+
+### Purpose
+
+- **API Testing Tool** — Provides a simple browser UI (via Streamlit) to call the backend endpoints and inspect responses without needing the full React frontend running.
+- **Development Aid** — Used during development to verify that query generation, schema loading, and SQL execution work correctly.
+- **Standalone** — Can be run independently to debug the API.
+
+### What It Does
+
+| Tab | Functionality |
+|-----|---------------|
+| **Query Builder** | A simplified form to select a table, pick columns, add WHERE conditions, GROUP BY, ORDER BY, and LIMIT — then generate SQL via the API. |
+| **SQL Editor** | A raw SQL text area where you can type any SQL query and execute it against the in-memory database. |
+| **Sample Queries** | Pre-built example queries that can be run with one click. |
+| **Analytics** | Shows database statistics (table counts, column counts) and provides quick analytics queries. |
+
+### How to Run
+
+```bash
+# Install Streamlit (if not already installed)
+pip install streamlit pandas plotly requests
+
+# Make sure the backend API is running first
+python api.py
+
+# Then in a separate terminal:
+streamlit run app.py
+```
+
+This opens a browser at `http://localhost:8501` with the Streamlit testing UI.
+
+### When to Use
+
+| Scenario | Use This |
+|----------|----------|
+| Normal day-to-day use | **React frontend** (`npm run dev` or the `.exe`) |
+| Testing/debugging the API | **`app.py`** (Streamlit) |
+| Quick API verification | **`http://localhost:8000/docs`** (Swagger UI) |
+
+> **Note:** `app.py` is not included in the `.exe` build. It's a development-only tool.
 
 ---
 
@@ -236,7 +431,10 @@ http://localhost:5173
 
 ```
 sql-query-generator/
-├── api.py                  # FastAPI backend — main entry point
+├── api.py                  # FastAPI backend — main entry point & query engine
+├── app.py                  # Streamlit testing UI (development/debugging tool)
+├── package_app.py          # PyInstaller build script (creates the .exe)
+├── SQL_Query_Generator.spec # PyInstaller configuration file
 ├── db_information.py       # Database introspection utilities
 ├── query_engine.py         # SQL generation engine
 ├── pypika_query_engine.py  # PyPika-based query builder
@@ -251,6 +449,9 @@ sql-query-generator/
 ├── requirements-core.txt   # Python deps for core query utilities
 ├── db_files/
 │   └── metadata.json       # Schema/table/column definitions (auto-loaded)
+│
+├── dist/
+│   └── SQL_Query_Generator.exe  # Standalone executable (~64 MB)
 │
 ├── frontend/
 │   ├── package.json        # Node project config & dependencies
@@ -302,6 +503,7 @@ sql-query-generator/
 | Command | Description |
 |---------|-------------|
 | `python api.py` | Start the FastAPI server on port 8000 |
+| `streamlit run app.py` | Launch the Streamlit testing UI (dev only) |
 
 ### Frontend (run from `frontend/` directory)
 
@@ -316,7 +518,8 @@ sql-query-generator/
 
 | Command | Description |
 |---------|-------------|
-| `python -m PyInstaller SQL_Query_Generator.spec --clean` | Build the standalone `.exe` containing frontend & backend |
+| `python package_app.py` | Build the standalone `.exe` (recommended — handles pre-flight checks) |
+| `python -m PyInstaller SQL_Query_Generator.spec --clean` | Build using the `.spec` file directly |
 
 ---
 
